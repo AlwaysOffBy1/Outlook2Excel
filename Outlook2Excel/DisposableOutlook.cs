@@ -33,7 +33,7 @@ namespace Outlook2Excel
         {
             Dictionary<string,string> output = new Dictionary<string,string>();
 
-            string message = item.Subject + " " + item.Body;
+            string message = item.Subject + "\n\n" + item.Body;
 
             //Before doing anything, check if primary key exists. If not, email is not what we're looking for
             output.Add(primaryKey, SearchFor(message, regexMap[primaryKey]) ?? "");

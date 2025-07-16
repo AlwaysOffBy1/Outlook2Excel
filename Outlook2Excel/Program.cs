@@ -27,7 +27,7 @@ namespace Outlook2Excel
                 Console.WriteLine("Reading inbox...");
                 var inbox = disposableOutlook.Namespace.GetSharedDefaultFolder(recipient, Outlook.OlDefaultFolders.olFolderInbox);
                 Console.WriteLine("Sorting inbox...");
-                string filter = $"[UnRead]=true AND [ReceivedTime] >= '{DateTime.Now.AddDays(-5):g}'";
+                string filter = $"[UnRead]=true AND [ReceivedTime] >= '{DateTime.Now.AddDays(-100):g}'";
                 var items = inbox.Items.Restrict(filter);
 
                 //Each email returns a dictionary where KEY = property and VALUE = regex result
@@ -41,7 +41,11 @@ namespace Outlook2Excel
                     Console.WriteLine($"Reading inbox email - {mi.Subject}");
                     //AppSettings makes sure values are not null and quits if they are
                     Dictionary<string,string>? outputDictionary = disposableOutlook.GetValueFromEmail(mi, AppSettings.RegexMap, AppSettings.PrimaryKey);
-                    if (outputDictionary != null)
+                    if (outputDictionary == null)
+                    {
+                        Console.WriteLine($"No {AppSettings.PrimaryKey} found");
+                    }
+                    else
                     {
                         Console.WriteLine($"Found key {outputDictionary[AppSettings.PrimaryKey]}");
                         outputDictionaryList.Add(outputDictionary);
@@ -50,6 +54,10 @@ namespace Outlook2Excel
 
                 //Add each email to excel
 
+                using (DisposableExcel disposableExcel = new DisposableExcel())
+                {
+                    disposableExcel.AddData(outputDictionaryList);
+                }
 
                 //TESTER
                 int i = 1;
@@ -68,6 +76,8 @@ namespace Outlook2Excel
             Console.WriteLine("Done.");
             Console.ReadLine();
         }
+
+
 
         static void Quit(string reason, int errorCode)
         {
