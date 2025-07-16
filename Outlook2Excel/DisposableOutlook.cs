@@ -7,6 +7,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System;
 using Outlook = Microsoft.Office.Interop.Outlook;
+using System.Text.RegularExpressions;
 
 namespace Outlook2Excel
 {
@@ -27,14 +28,46 @@ namespace Outlook2Excel
         public Outlook.Application App => _outlookApp;
         public Outlook.NameSpace Namespace => _namespace;
         public Outlook.Recipient Recipient => _recipient;
+        
+        public Dictionary<string,string>? GetValueFromEmail(Outlook.MailItem item, Dictionary<string,string> regexMap, string primaryKey)
+        {
+            Dictionary<string,string> output = new Dictionary<string,string>();
+
+            string message = item.Subject + " " + item.Body;
+
+            //Before doing anything, check if primary key exists. If not, email is not what we're looking for
+            output.Add(primaryKey, SearchFor(message, regexMap[primaryKey]) ?? "");
+            if (output[primaryKey] == "" || output[primaryKey] == null) return null;
+
+            output.Add("Email Date", item.ReceivedTime.ToString("MM/dd/yyyy: hh:mm tt"));
+            output.Add("Subject", item.Subject.ToString());
+            output.Add("Body", message);
+
+            //Loop through regex map to search for properties
+            foreach (var pair in regexMap) 
+            {
+                if (pair.Key == primaryKey) continue; //we already found primary key at beginning
+                string? foundVal = SearchFor(message, pair.Value);
+                if (foundVal != null) output.Add(pair.Key, foundVal);
+            }
+            //If you're looking for REQ numbers but none appear in the email, don't bother
+            if (output[primaryKey] == "") return null;
+            return output;
+        }
+        private string? SearchFor(string message, string pattern)
+        {
+            //Instead of looping through all properties, separated this part so PrimaryKey can be searched for first
+            var match = Regex.Match(message, pattern);
+            if (match.Success && 
+                match.Groups.Count > 0) return match.Groups[1].Value.Trim();
+            else return null;
+        }
 
         public void Dispose()
         {
             Dispose(true);
             GC.SuppressFinalize(this);
-        }
-
-        
+        }  
 
         protected virtual void Dispose(bool disposing)
         {

@@ -26,34 +26,42 @@ namespace Outlook2Excel
 
                 Console.WriteLine("Reading inbox...");
                 var inbox = disposableOutlook.Namespace.GetSharedDefaultFolder(recipient, Outlook.OlDefaultFolders.olFolderInbox);
-                var filter = $"[UnRead]=true AND [ReceivedTime] >= '{DateTime.Now.AddDays(-5):g}'";
+                string filter = $"[UnRead]=true AND [ReceivedTime] >= '{DateTime.Now.AddDays(-5):g}'";
                 var items = inbox.Items.Restrict(filter);
 
+                //Each email returns a dictionary where KEY = property and VALUE = regex result
+                List<Dictionary<string,string>> outputDictionaryList = new List<Dictionary<string,string>>();
+
+                //Look up regex values in each email
+                foreach(object item in items)
+                {
+                    if (item is not Outlook.MailItem mail) continue;
+                    Outlook.MailItem mi = (Outlook.MailItem)item;
+                    #pragma warning disable CS8604 // Possible null reference argument. AppSettings makes sure values are not null and quits if they are
+                    Dictionary<string,string>? outputDictionary = disposableOutlook.GetValueFromEmail(mi, AppSettings.RegexMap, AppSettings.PrimaryKey);
+                    if(outputDictionary != null) outputDictionaryList.Add(outputDictionary);
+                    #pragma warning restore CS8604 // Possible null reference argument.
+                }
+
+                //Add each email to excel
+
+
+                //TESTER
+                int i = 1;
+                foreach(Dictionary<string,string> outputDictionary in outputDictionaryList)
+                {
+                    Console.WriteLine($"Dictionary for email {i}");
+                    i++;
+                    foreach(var item in outputDictionary)
+                    {
+                        if (item.Key == "Body") continue;
+                        Console.WriteLine("\t" +item.Key + ": " + item.Value);
+                    }
+                }
+
             }
-            
-            
-
-            //foreach (object item in items)
-            //{
-            //    if (item is Outlook.MailItem mail)
-            //    {
-            //        string subject = mail.Subject;
-            //        string sender = mail.SenderName;
-            //        DateTime received = mail.ReceivedTime;
-
-            //        string orderNumber = ExtractOrderNumber(subject);
-            //        if (!string.IsNullOrEmpty(orderNumber))
-            //        {
-            //            Console.WriteLine($"Order #{orderNumber} from {sender} at {received}");
-            //            // TODO: Write to Excel here
-            //        }
-
-            //        mail.UnRead = false; // mark as read
-            //        mail.Save();
-            //    }
-            //}
-
             Console.WriteLine("Done.");
+            Console.ReadLine();
         }
 
         static string ExtractOrderNumber(string subject)

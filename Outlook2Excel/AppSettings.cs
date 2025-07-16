@@ -12,7 +12,7 @@ namespace Outlook2Excel
         public static string? Mailbox;
         public static string? PrimaryKey;
         public static string? ExcelFilePath;
-        public static List<ImportObject>? ImportObjects;
+        public static Dictionary<string, string>? RegexMap;
 
         public static bool GetSettings()
         {
@@ -27,19 +27,19 @@ namespace Outlook2Excel
             Mailbox = config["Mailbox"];
             PrimaryKey = config["PrimaryKey"];
             ExcelFilePath = config["ExcelFilePath"];
-            ImportObjects = ImportEmailMappings(config);
+            RegexMap = ImportEmailMappings(config);
 
             //If any vars are null return false
             return Mailbox != null
                 && PrimaryKey != null
                 && ExcelFilePath != null
-                && ImportObjects != null;
+                && RegexMap != null;
         }
 
-        private static List<ImportObject>? ImportEmailMappings(IConfiguration config)
+        private static Dictionary<string,string>? ImportEmailMappings(IConfiguration config)
         {
             //Get list of keyvaluepairs to be imported, and import them as an "IConfigurationSection"
-            var list = new List<ImportObject>();
+            var list = new Dictionary<string, string>();
             var section = config.GetSection("EmailMessageMapping");
 
             foreach (var child in section.GetChildren())
@@ -49,7 +49,7 @@ namespace Outlook2Excel
                 string? value = child.Value;
                 if (key == null || value == null) return null;
 
-                list.Add(new ImportObject(key, value));
+                list.Add(key, value);
             }
 
             return list;
