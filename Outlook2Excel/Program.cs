@@ -15,17 +15,18 @@ namespace Outlook2Excel
             Console.WriteLine("Starting EmailOrderProcessor...");
             Console.WriteLine("Importing App settings");
 
-            if (!AppSettings.GetSettings()) Quit("Not all app settings were imported. Check app settings file.");
+            if (!AppSettings.GetSettings()) Quit("Not all app settings were imported. Check app settings file.", 101);
 
             using (DisposableOutlook disposableOutlook = new DisposableOutlook(AppSettings.Mailbox))
             {
                 var recipient = disposableOutlook.Recipient;
                 recipient.Resolve();
-                if (!recipient.Resolved) Quit("Could not access outlook");
+                if (!recipient.Resolved) Quit("Could not access outlook", 201);
                 Console.WriteLine($"Resolved: {recipient.Name}");
 
                 Console.WriteLine("Reading inbox...");
                 var inbox = disposableOutlook.Namespace.GetSharedDefaultFolder(recipient, Outlook.OlDefaultFolders.olFolderInbox);
+                Console.WriteLine("Sorting inbox...");
                 string filter = $"[UnRead]=true AND [ReceivedTime] >= '{DateTime.Now.AddDays(-5):g}'";
                 var items = inbox.Items.Restrict(filter);
 
@@ -37,10 +38,14 @@ namespace Outlook2Excel
                 {
                     if (item is not Outlook.MailItem mail) continue;
                     Outlook.MailItem mi = (Outlook.MailItem)item;
-                    #pragma warning disable CS8604 // Possible null reference argument. AppSettings makes sure values are not null and quits if they are
+                    Console.WriteLine($"Reading inbox email - {mi.Subject}");
+                    //AppSettings makes sure values are not null and quits if they are
                     Dictionary<string,string>? outputDictionary = disposableOutlook.GetValueFromEmail(mi, AppSettings.RegexMap, AppSettings.PrimaryKey);
-                    if(outputDictionary != null) outputDictionaryList.Add(outputDictionary);
-                    #pragma warning restore CS8604 // Possible null reference argument.
+                    if (outputDictionary != null)
+                    {
+                        Console.WriteLine($"Found key {outputDictionary[AppSettings.PrimaryKey]}");
+                        outputDictionaryList.Add(outputDictionary);
+                    }
                 }
 
                 //Add each email to excel
@@ -64,16 +69,10 @@ namespace Outlook2Excel
             Console.ReadLine();
         }
 
-        static string ExtractOrderNumber(string subject)
-        {
-            var match = Regex.Match(subject, @"Order\s*#?(\d+)", RegexOptions.IgnoreCase);
-            return match.Success ? match.Groups[1].Value : null;
-        }
-
-        static void Quit(string reason)
+        static void Quit(string reason, int errorCode)
         {
             Console.WriteLine(reason);
-            Environment.Exit(0);
+            Environment.Exit(errorCode);
         }
     }
 }
