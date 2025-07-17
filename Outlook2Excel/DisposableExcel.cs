@@ -37,35 +37,47 @@ namespace Outlook2Excel
 
         public void AddData(List<Dictionary<string, string>> data)
         {
-            if (data == null || data.Count == 0)
-                return;
+            _excelApp.ScreenUpdating = false;
+            _excelApp.Interactive = false;
 
-            var headers = data[0].Keys.ToList();
-
-            // Write headers
-            for (int col = 0; col < headers.Count; col++)
+            //Dont like large try's, but user can interfere at any time in so many ways
+            try
             {
-                _worksheet.Cells[1, col + 1] = headers[col];
-            }
+                if (data == null || data.Count == 0)
+                    return;
 
-            // Write each row of data
-            for (int row = 0; row < data.Count; row++)
-            {
-                var dict = data[row];
+                var headers = data[0].Keys.ToList();
+
+                //Write headers
                 for (int col = 0; col < headers.Count; col++)
                 {
-                    try
+                    _worksheet.Cells[1, col + 1] = headers[col];
+                }
+
+                //Write each row of data
+                double rows = data.Count;
+                for (int row = 0; row < data.Count; row++)
+                {
+                    var dict = data[row];
+                    _excelApp.StatusBar = $"PROCESSING ROW {row} of {rows} - {(int)((row/rows)*100)}%";
+                    for (int col = 0; col < headers.Count; col++)
                     {
-                        if (headers.Contains(dict[headers[col]]))
+                        if (dict.ContainsKey(headers[col]))
                             _worksheet.Cells[row + 2, col + 1] = dict[headers[col]];
                     }
-                    catch (Exception e)
-                    {
-                        Console.WriteLine($"KEY ({dict[headers[col]]}) WAS NOT IN DICTIONARY ({dict[AppSettings.PrimaryKey]}");
-                    }
-                    
                 }
             }
+            catch(Exception ex)
+            {
+                Console.WriteLine(ex.ToString());
+                Program.Quit(ex.Message, 301);
+            }
+            _worksheet.Cells.RowHeight = _worksheet.StandardHeight;
+            _worksheet.Cells.ColumnWidth = _worksheet.StandardWidth;
+            _excelApp.StatusBar = "PROCESSING DONE";
+            _excelApp.ScreenUpdating = true;
+            _excelApp.Interactive = true;
+            
         }
 
         public void Dispose()

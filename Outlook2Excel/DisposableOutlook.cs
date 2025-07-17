@@ -35,23 +35,25 @@ namespace Outlook2Excel
 
             string message = item.Subject + "\n\n" + item.Body;
 
-            //Before doing anything, check if primary key exists. If not, email is not what we're looking for
-            output.Add(primaryKey, SearchFor(message, regexMap[primaryKey]) ?? "");
-            if (output[primaryKey] == "" || output[primaryKey] == null) return null;
+            //Before doing anything, if we have a primary key, check the email for it first
+            if (primaryKey != "")
+            {
+                if (!output.Keys.Contains(primaryKey)) Program.Quit($"Primary key {primaryKey} not found in EmailMessageMapping. Please add it and try again", 100);
+                output.Add(primaryKey, SearchFor(message, regexMap[primaryKey]) ?? "");
+                if (output[primaryKey] == "" || output[primaryKey] == null) return null;
+            }
 
-            output.Add("Email Date", item.ReceivedTime.ToString("MM/dd/yyyy: hh:mm tt"));
-            output.Add("Subject", item.Subject.ToString());
-            output.Add("Body", message);
+            output.Add("Email Date", item.ReceivedTime.ToString("MM/dd/yyyy hh:mm tt"));
+            output.Add("Subject", item.Subject);
+            output.Add("Body", item.Body);
 
             //Loop through regex map to search for properties
             foreach (var pair in regexMap) 
             {
-                if (pair.Key == primaryKey) continue; //we already found primary key at beginning
+                if (pair.Key == primaryKey) continue;
                 string? foundVal = SearchFor(message, pair.Value);
                 if (foundVal != null) output.Add(pair.Key, foundVal);
             }
-            //If you're looking for REQ numbers but none appear in the email, don't bother
-            if (output[primaryKey] == "") return null;
             return output;
         }
         private string? SearchFor(string message, string pattern)

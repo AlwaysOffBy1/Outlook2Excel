@@ -17,6 +17,9 @@ namespace Outlook2Excel
 
             if (!AppSettings.GetSettings()) Quit("Not all app settings were imported. Check app settings file.", 101);
 
+            //Each email returns a dictionary where KEY = property and VALUE = regex result
+            List<Dictionary<string, string>> outputDictionaryList = new List<Dictionary<string, string>>();
+
             using (DisposableOutlook disposableOutlook = new DisposableOutlook(AppSettings.Mailbox))
             {
                 var recipient = disposableOutlook.Recipient;
@@ -25,13 +28,20 @@ namespace Outlook2Excel
                 Console.WriteLine($"Resolved: {recipient.Name}");
 
                 Console.WriteLine("Reading inbox...");
-                var inbox = disposableOutlook.Namespace.GetSharedDefaultFolder(recipient, Outlook.OlDefaultFolders.olFolderInbox);
+                Outlook.MAPIFolder? inbox = null;
+                try
+                {
+                    inbox = disposableOutlook.Namespace.GetSharedDefaultFolder(recipient, Outlook.OlDefaultFolders.olFolderInbox);
+                }
+                catch (System.Exception ex)
+                {
+                    Quit($"The mailbox {AppSettings.Mailbox} in appsettings.json is inaccessible to this PC. Please add the mailbox to Outlook and try again", 100);
+                    return; //need this to elimiate possible null reference of inbox warn
+                }
+                
                 Console.WriteLine("Sorting inbox...");
-                string filter = $"[UnRead]=true AND [ReceivedTime] >= '{DateTime.Now.AddDays(-100):g}'";
+                string filter = $"[UnRead]=true AND [ReceivedTime] >= '{DateTime.Now.AddDays(0-AppSettings.DaysToGoBack):g}'";
                 var items = inbox.Items.Restrict(filter);
-
-                //Each email returns a dictionary where KEY = property and VALUE = regex result
-                List<Dictionary<string,string>> outputDictionaryList = new List<Dictionary<string,string>>();
 
                 //Look up regex values in each email
                 foreach(object item in items)
@@ -41,45 +51,33 @@ namespace Outlook2Excel
                     Console.WriteLine($"Reading inbox email - {mi.Subject}");
                     //AppSettings makes sure values are not null and quits if they are
                     Dictionary<string,string>? outputDictionary = disposableOutlook.GetValueFromEmail(mi, AppSettings.RegexMap, AppSettings.PrimaryKey);
+                    
+                    //Just a difficult way of showing the user if their primary key was found, or if they dont have one, that an email was found
                     if (outputDictionary == null)
                     {
-                        Console.WriteLine($"No {AppSettings.PrimaryKey} found");
+                        Console.WriteLine($"No {(AppSettings.PrimaryKey != "" ? "email":AppSettings.PrimaryKey)} found");
                     }
                     else
                     {
-                        Console.WriteLine($"Found key {outputDictionary[AppSettings.PrimaryKey]}");
+                        Console.WriteLine($"Found {(AppSettings.PrimaryKey != "" ? $"key {outputDictionary[AppSettings.PrimaryKey]}" : "email")}");
                         outputDictionaryList.Add(outputDictionary);
                     }
                 }
-
-                //Add each email to excel
-
-                using (DisposableExcel disposableExcel = new DisposableExcel())
-                {
-                    disposableExcel.AddData(outputDictionaryList);
-                }
-
-                //TESTER
-                int i = 1;
-                foreach(Dictionary<string,string> outputDictionary in outputDictionaryList)
-                {
-                    Console.WriteLine($"Dictionary for email {i}");
-                    i++;
-                    foreach(var item in outputDictionary)
-                    {
-                        if (item.Key == "Body") continue;
-                        Console.WriteLine("\t" +item.Key + ": " + item.Value);
-                    }
-                }
-
             }
+
+            //Add each email to excel
+            using (DisposableExcel disposableExcel = new DisposableExcel())
+            {
+                disposableExcel.AddData(outputDictionaryList);
+            }
+
             Console.WriteLine("Done.");
             Console.ReadLine();
         }
 
 
 
-        static void Quit(string reason, int errorCode)
+        public static void Quit(string reason, int errorCode)
         {
             Console.WriteLine(reason);
             Environment.Exit(errorCode);

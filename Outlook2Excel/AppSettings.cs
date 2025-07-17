@@ -13,6 +13,8 @@ namespace Outlook2Excel
         public static string? PrimaryKey;
         public static string? ExcelFilePath;
         public static Dictionary<string, string>? RegexMap;
+        public static bool IsContainsPrimaryKey = false;
+        public static int DaysToGoBack = 1;
 
         public static bool GetSettings()
         {
@@ -26,7 +28,9 @@ namespace Outlook2Excel
             //Set vars
             Mailbox = config["Mailbox"];
             PrimaryKey = config["PrimaryKey"];
+            IsContainsPrimaryKey = PrimaryKey != "";
             ExcelFilePath = config["ExcelFilePath"];
+            DaysToGoBack = TryConvertToInt(config["DaysToGoBack"]);
             RegexMap = ImportEmailMappings(config);
 
             //If any vars are null return false
@@ -53,6 +57,12 @@ namespace Outlook2Excel
             }
 
             return list;
+        }
+
+        private static int TryConvertToInt(string? value)
+        {
+            if(int.TryParse(value, out int result)) return result;
+            return 1;
         }
     }
 }
