@@ -66,9 +66,9 @@ namespace Outlook2Excel
             }
 
             //Add each email to excel
-            using (DisposableExcel disposableExcel = new DisposableExcel())
+            using (DisposableExcel disposableExcel = new DisposableExcel(AppSettings.ExcelFilePath))
             {
-                disposableExcel.AddData(outputDictionaryList);
+                disposableExcel.AddData(outputDictionaryList, AppSettings.PrimaryKey);
             }
 
             Console.WriteLine("Done.");

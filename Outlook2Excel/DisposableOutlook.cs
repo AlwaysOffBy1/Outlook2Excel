@@ -38,7 +38,6 @@ namespace Outlook2Excel
             //Before doing anything, if we have a primary key, check the email for it first
             if (primaryKey != "")
             {
-                if (!output.Keys.Contains(primaryKey)) Program.Quit($"Primary key {primaryKey} not found in EmailMessageMapping. Please add it and try again", 100);
                 output.Add(primaryKey, SearchFor(message, regexMap[primaryKey]) ?? "");
                 if (output[primaryKey] == "" || output[primaryKey] == null) return null;
             }
