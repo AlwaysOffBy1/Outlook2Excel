@@ -1,0 +1,128 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Security.Cryptography.X509Certificates;
+using System.Text;
+using System.Threading.Tasks;
+using Timer = System.Timers.Timer;
+using Outlook = Microsoft.Office.Interop.Outlook;
+using System.Timers;
+
+namespace Outlook2Excel.Core
+{
+    public class Engine :IDisposable
+    {
+        public string Progress;
+        public DisposableExcel _disposableExcel;
+        private Timer _timer;
+        public Engine() 
+        {
+            Progress = "Initializing";
+            if (!AppSettings.GetSettings()) Quit("Not all app settings were imported. Check app settings file.", 101);
+
+            _disposableExcel = new DisposableExcel(AppSettings.ExcelFilePath);
+
+            _timer = new Timer(AppSettings.TimerInterval); //5 minutes is default
+            _timer.AutoReset = true;
+            _timer.Elapsed += TimerTicked;
+            Progress = "Initialized";
+        }
+
+        private void TimerTicked(object sender, ElapsedEventArgs e)
+        {
+            RunNow();
+        }
+
+        //Public API
+        public void RunNow() 
+        {
+            //Returns a list (each email) of dictionary<string,string> (The lookup key and lookup result per email)
+            List<Dictionary<string, string>> outputDictionaryList = GetDataFromOutlook();
+
+            //Add each email to excel
+            _disposableExcel.AddData(outputDictionaryList, AppSettings.PrimaryKey);
+        }
+        public void Pause() 
+        { 
+            _timer.Stop();
+        }
+        public void UnPause()
+        {
+            _timer.Start();
+        }
+        public void SetRunInterval(int intervalInMinutes)
+        {
+            _timer.Stop();
+            if(intervalInMinutes <= 0) intervalInMinutes = AppSettings.TimerInterval;
+            _timer.Interval = intervalInMinutes;
+            _timer.Start();
+        }
+        public string GetStatus() { return Progress; }
+        public void Quit(string reason, int errorCode)
+        {
+            Console.WriteLine(reason);
+            Environment.Exit(errorCode);
+        }
+
+        public void Dispose()
+        {
+            _disposableExcel?.Dispose();
+        }
+
+
+
+        private List<Dictionary<string, string>> GetDataFromOutlook()
+        {
+            //Each email returns a dictionary where KEY = property and VALUE = regex result
+            List<Dictionary<string, string>> outputDictionaryList = new List<Dictionary<string, string>>();
+
+            using (DisposableOutlook disposableOutlook = new DisposableOutlook(AppSettings.Mailbox))
+            {
+                var recipient = disposableOutlook.Recipient;
+                recipient.Resolve();
+                if (!recipient.Resolved) Quit("Could not access outlook", 201);
+
+                Outlook.MAPIFolder? inbox = null;
+                try
+                {
+                    inbox = disposableOutlook.Namespace.GetSharedDefaultFolder(recipient, Outlook.OlDefaultFolders.olFolderInbox);
+                }
+                catch (System.Exception ex)
+                {
+                    Quit($"The mailbox {AppSettings.Mailbox} in appsettings.json is inaccessible to this PC. Please add the mailbox to Outlook and try again", 100);
+                    return new List<Dictionary<string, string>>(); //need this to elimiate possible null reference of inbox warn
+                }
+
+                Console.WriteLine("Sorting inbox...");
+                string filter = $"[ReceivedTime] >= '{DateTime.Now.AddDays(0 - AppSettings.DaysToGoBack):g}'";
+                var items = inbox.Items.Restrict(filter);
+
+                //Look up regex values in each email
+                foreach (object item in items)
+                {
+                    if (item is not Outlook.MailItem mail) continue;
+                    Outlook.MailItem mi = (Outlook.MailItem)item;
+
+                    //AppSettings makes sure values are not null and quits if they are
+                    Dictionary<string, string>? outputDictionary = disposableOutlook.GetValueFromEmail(mi, AppSettings.RegexMap, AppSettings.PrimaryKey);
+
+
+                    if (outputDictionary != null) outputDictionaryList.Add(outputDictionary);
+                    //Just a difficult way of showing the user if their primary key was found, or if they dont have one, that an email was found
+                    //if (outputDictionary == null)
+                    //{
+                    //    Console.WriteLine($"No {(AppSettings.PrimaryKey != "" ? "email" : AppSettings.PrimaryKey)} found");
+                    //}
+                    //else
+                    //{
+                    //    Console.WriteLine($"Found {(AppSettings.PrimaryKey != "" ? $"key {outputDictionary[AppSettings.PrimaryKey]}" : "email")}");
+                    //    outputDictionaryList.Add(outputDictionary);
+                    //}
+                }
+            }
+            return outputDictionaryList;
+        }
+
+        
+    }
+}
