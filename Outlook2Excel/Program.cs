@@ -1,22 +1,19 @@
 ﻿using System;
 using System.Text.RegularExpressions;
 using Outlook = Microsoft.Office.Interop.Outlook;
-using Microsoft.Extensions.Configuration;
-using System.IO;
-using System.Runtime.CompilerServices;
-using Microsoft.Office.Interop.Outlook;
+using System;
+using Timer = System.Timers.Timer;
 
 namespace Outlook2Excel
 {
     class Program
     {
-        static void Main(string[] args)
+
+        private static Timer _timer;
+        private static DisposableExcel _disposableExcel;
+
+        public static List<Dictionary<string,string>> GetDataFromOutlook()
         {
-            Console.WriteLine("Starting EmailOrderProcessor...");
-            Console.WriteLine("Importing App settings");
-
-            if (!AppSettings.GetSettings()) Quit("Not all app settings were imported. Check app settings file.", 101);
-
             //Each email returns a dictionary where KEY = property and VALUE = regex result
             List<Dictionary<string, string>> outputDictionaryList = new List<Dictionary<string, string>>();
 
@@ -36,26 +33,26 @@ namespace Outlook2Excel
                 catch (System.Exception ex)
                 {
                     Quit($"The mailbox {AppSettings.Mailbox} in appsettings.json is inaccessible to this PC. Please add the mailbox to Outlook and try again", 100);
-                    return; //need this to elimiate possible null reference of inbox warn
+                    return new List<Dictionary<string,string>>(); //need this to elimiate possible null reference of inbox warn
                 }
-                
+
                 Console.WriteLine("Sorting inbox...");
-                string filter = $"[UnRead]=true AND [ReceivedTime] >= '{DateTime.Now.AddDays(0-AppSettings.DaysToGoBack):g}'";
+                string filter = $"[UnRead]=true AND [ReceivedTime] >= '{DateTime.Now.AddDays(0 - AppSettings.DaysToGoBack):g}'";
                 var items = inbox.Items.Restrict(filter);
 
                 //Look up regex values in each email
-                foreach(object item in items)
+                foreach (object item in items)
                 {
                     if (item is not Outlook.MailItem mail) continue;
                     Outlook.MailItem mi = (Outlook.MailItem)item;
                     Console.WriteLine($"Reading inbox email - {mi.Subject}");
                     //AppSettings makes sure values are not null and quits if they are
-                    Dictionary<string,string>? outputDictionary = disposableOutlook.GetValueFromEmail(mi, AppSettings.RegexMap, AppSettings.PrimaryKey);
-                    
+                    Dictionary<string, string>? outputDictionary = disposableOutlook.GetValueFromEmail(mi, AppSettings.RegexMap, AppSettings.PrimaryKey);
+
                     //Just a difficult way of showing the user if their primary key was found, or if they dont have one, that an email was found
                     if (outputDictionary == null)
                     {
-                        Console.WriteLine($"No {(AppSettings.PrimaryKey != "" ? "email":AppSettings.PrimaryKey)} found");
+                        Console.WriteLine($"No {(AppSettings.PrimaryKey != "" ? "email" : AppSettings.PrimaryKey)} found");
                     }
                     else
                     {
@@ -64,18 +61,37 @@ namespace Outlook2Excel
                     }
                 }
             }
+            return outputDictionaryList;
+        }
+        static void Main(string[] args)
+        {
+            Console.WriteLine("Starting...");
 
-            //Add each email to excel
-            using (DisposableExcel disposableExcel = new DisposableExcel(AppSettings.ExcelFilePath))
-            {
-                disposableExcel.AddData(outputDictionaryList, AppSettings.PrimaryKey);
-            }
+            Console.WriteLine("Importing settings");
+            if (!AppSettings.GetSettings()) Quit("Not all app settings were imported. Check app settings file.", 101);
 
-            Console.WriteLine("Done.");
-            Console.ReadLine();
+            _timer = new Timer(5 * 60 * 1000); //5 mins
+            _timer.Elapsed += OnTick;
+            _timer.AutoReset = true;
+            _timer.Enabled = true;
+
+            _disposableExcel = new DisposableExcel(AppSettings.ExcelFilePath);
         }
 
+        private static void OnTick(object? sender, System.Timers.ElapsedEventArgs e)
+        {
+            
 
+            //Excel should stay open the entire time, and the loop should run on outlook, which can be closed/reopened to reduce load
+            using (_disposableExcel)
+            {
+                //Returns a list (each email) of dictionary<string,string> (The lookup key and lookup result per email)
+                List<Dictionary<string, string>> outputDictionaryList = GetDataFromOutlook();
+
+                //Add each email to excel
+                _disposableExcel.AddData(outputDictionaryList, AppSettings.PrimaryKey);
+            }
+        }
 
         public static void Quit(string reason, int errorCode)
         {
