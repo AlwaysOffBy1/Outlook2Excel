@@ -8,10 +8,6 @@ namespace Outlook2Excel
 {
     class Program
     {
-
-        private static Timer _timer;
-        private static DisposableExcel _disposableExcel;
-
         public static List<Dictionary<string,string>> GetDataFromOutlook()
         {
             //Each email returns a dictionary where KEY = property and VALUE = regex result
@@ -70,26 +66,14 @@ namespace Outlook2Excel
             Console.WriteLine("Importing settings");
             if (!AppSettings.GetSettings()) Quit("Not all app settings were imported. Check app settings file.", 101);
 
-            _timer = new Timer(5 * 60 * 1000); //5 mins
-            _timer.Elapsed += OnTick;
-            _timer.AutoReset = true;
-            _timer.Enabled = true;
-
-            _disposableExcel = new DisposableExcel(AppSettings.ExcelFilePath);
-        }
-
-        private static void OnTick(object? sender, System.Timers.ElapsedEventArgs e)
-        {
-            
-
             //Excel should stay open the entire time, and the loop should run on outlook, which can be closed/reopened to reduce load
-            using (_disposableExcel)
+            using (DisposableExcel disposableExcel = new DisposableExcel(AppSettings.ExcelFilePath))
             {
                 //Returns a list (each email) of dictionary<string,string> (The lookup key and lookup result per email)
                 List<Dictionary<string, string>> outputDictionaryList = GetDataFromOutlook();
 
                 //Add each email to excel
-                _disposableExcel.AddData(outputDictionaryList, AppSettings.PrimaryKey);
+                disposableExcel.AddData(outputDictionaryList, AppSettings.PrimaryKey);
             }
         }
 
