@@ -18,13 +18,18 @@ namespace Outlook2Excel.Core
         public Engine() 
         {
             Progress = "Initializing";
-            if (!AppSettings.GetSettings()) Quit("Not all app settings were imported. Check app settings file.", 101);
+            if (!AppSettings.GetSettings()) StaticMethods.Quit("Not all app settings were imported. Check app settings file.", 101);
 
+            //This opens Excel, which should stay open
             _disposableExcel = new DisposableExcel(AppSettings.ExcelFilePath);
 
             _timer = new Timer(AppSettings.TimerInterval); //5 minutes is default
             _timer.AutoReset = true;
             _timer.Elapsed += TimerTicked;
+            _timer.Enabled = true;
+            _timer.Start();
+            
+            RunNow();
             Progress = "Initialized";
         }
 
@@ -58,11 +63,6 @@ namespace Outlook2Excel.Core
             _timer.Start();
         }
         public string GetStatus() { return Progress; }
-        public void Quit(string reason, int errorCode)
-        {
-            Console.WriteLine(reason);
-            Environment.Exit(errorCode);
-        }
 
         public void Dispose()
         {
@@ -80,7 +80,7 @@ namespace Outlook2Excel.Core
             {
                 var recipient = disposableOutlook.Recipient;
                 recipient.Resolve();
-                if (!recipient.Resolved) Quit("Could not access outlook", 201);
+                if (!recipient.Resolved) StaticMethods.Quit("Could not access outlook", 201);
 
                 Outlook.MAPIFolder? inbox = null;
                 try
@@ -89,7 +89,7 @@ namespace Outlook2Excel.Core
                 }
                 catch (System.Exception ex)
                 {
-                    Quit($"The mailbox {AppSettings.Mailbox} in appsettings.json is inaccessible to this PC. Please add the mailbox to Outlook and try again", 100);
+                    StaticMethods.Quit($"The mailbox {AppSettings.Mailbox} in appsettings.json is inaccessible to this PC. Please add the mailbox to Outlook and try again", 100);
                     return new List<Dictionary<string, string>>(); //need this to elimiate possible null reference of inbox warn
                 }
 

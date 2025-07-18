@@ -1,5 +1,6 @@
 ﻿using System.Runtime.InteropServices;
 using Microsoft.Office.Interop.Excel;
+using Outlook2Excel.Core;
 
 namespace Outlook2Excel
 {
@@ -20,7 +21,7 @@ namespace Outlook2Excel
         public DisposableExcel(string path)
         {
             if (!File.Exists(path))
-                Program.Quit("Excel file path not found", 100);
+                StaticMethods.Quit("Excel file path not found", 100);
 
             PrimaryKeysAlreadyInExcel = new List<string>();
             ExcelHeaders = new Dictionary<string, int>();
@@ -32,7 +33,7 @@ namespace Outlook2Excel
                 _worksheet = (Worksheet)_workbook.Sheets[1];
             }
             catch (COMException ex){
-                Program.Quit("Failed to open Excel file. It might already be open.\n" + ex.Message, 301);}
+                StaticMethods.Quit("Failed to open Excel file. It might already be open.\n" + ex.Message, 301);}
 
             if(_workbook == null) _workbook = new Workbook();
             if(_worksheet == null) _worksheet = new Worksheet();
@@ -107,7 +108,7 @@ namespace Outlook2Excel
             catch(Exception ex)
             {
                 Console.WriteLine(ex.ToString());
-                Program.Quit(ex.Message, 301);
+                StaticMethods.Quit(ex.Message, 301);
             }
             _excelApp.StatusBar = "PROCESSING DONE";
             _excelApp.ScreenUpdating = true;
