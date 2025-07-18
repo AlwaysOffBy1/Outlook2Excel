@@ -55,7 +55,7 @@ namespace Outlook2Excel
         private void AlignDictHeadersWithExcelHeaders(string[] dataHeaders)
         {
             //Write headers if none exist already
-            if (string.IsNullOrEmpty(_worksheet.Cells[1, 1].Value))
+            if (string.IsNullOrEmpty(_worksheet.Cells[1, 1].Value2))
                 for (int col = 0; col < 100; col++)
                 {
                     _worksheet.Cells[1, col + 1] = dataHeaders[col];
@@ -66,7 +66,9 @@ namespace Outlook2Excel
             //Otherwise, read headers
             for (int col = 0; col < 100; col++)
             {
-                ExcelHeaders.Add(_worksheet.Cells[1, col + 1], col + 1);
+                string header = _worksheet.Cells[1, col + 1].Value2;
+                if (string.IsNullOrEmpty(header)) break;
+                ExcelHeaders.Add(header, col + 1);
             }
 
             if (ExcelHeaders.Count < dataHeaders.Count()) Console.WriteLine("!!! Not all excel fields match up with your outlook fields. Some fields will be missing!");
@@ -107,10 +109,6 @@ namespace Outlook2Excel
                         if(ExcelHeaders.Keys.Contains(key))
                             _worksheet.Cells[startRow + row, ExcelHeaders[key]] = dict[key];
                     }
-                    //for (int col = 0; col < ExcelHeaders.Count-1; col++)
-                    //{
-                    //    _worksheet.Cells[startRow + row, col + 1].Value2 = dict[ExcelHeaders[col]];
-                    //}
                 }
             }
             catch(Exception ex)
