@@ -7,45 +7,69 @@ using System.Threading.Tasks;
 using Timer = System.Timers.Timer;
 using Outlook = Microsoft.Office.Interop.Outlook;
 using System.Timers;
+using System.Diagnostics;
+using System.ComponentModel;
 
 namespace Outlook2Excel.Core
 {
-    public class Engine :IDisposable
+    public class Engine : IDisposable, INotifyPropertyChanged
     {
         public string Progress;
         public DisposableExcel _disposableExcel;
         private Timer _timer;
+        private string lastRan = "";
+
+        public string LastRan
+        {
+            get => lastRan;
+            set 
+            {
+                if (lastRan != value)
+                {
+                    lastRan = value;
+                    OnPropertyChanged(nameof(LastRan));
+                }
+            }
+        }
+
         public Engine() 
         {
             Progress = "Initializing";
             if (!AppSettings.GetSettings()) StaticMethods.Quit("Not all app settings were imported. Check app settings file.", 101);
 
             //This opens Excel, which should stay open
+            Debug.WriteLine("Opening Excel...");
             _disposableExcel = new DisposableExcel(AppSettings.ExcelFilePath);
 
-            _timer = new Timer(AppSettings.TimerInterval); //5 minutes is default
+            _timer = new Timer(AppSettings.TimerInterval * 60 * 1000); //5 minutes is default
             _timer.AutoReset = true;
             _timer.Elapsed += TimerTicked;
             _timer.Enabled = true;
             _timer.Start();
             
-            RunNow();
             Progress = "Initialized";
         }
 
         private void TimerTicked(object sender, ElapsedEventArgs e)
         {
             RunNow();
+            LastRan = $"Last ran - {DateTime.Now.ToString("MM/dd/yy - hh:mm tt")}";
         }
 
         //Public API
         public void RunNow() 
         {
-            //Returns a list (each email) of dictionary<string,string> (The lookup key and lookup result per email)
-            List<Dictionary<string, string>> outputDictionaryList = GetDataFromOutlook();
+            System.Diagnostics.Debug.WriteLine("Starting now...");
+            //Prevent UI lockup with Task.Run
+            Task.Run(() =>
+            {
+                //Returns a list (each email) of dictionary<string,string> (The lookup key and lookup result per email)
+                List<Dictionary<string, string>> outputDictionaryList = GetDataFromOutlook();
 
-            //Add each email to excel
-            _disposableExcel.AddData(outputDictionaryList, AppSettings.PrimaryKey);
+                //Add each email to excel
+                _disposableExcel.AddData(outputDictionaryList, AppSettings.PrimaryKey);
+            });
+            System.Diagnostics.Debug.WriteLine("Finshed");
         }
         public void Pause() 
         { 
@@ -123,6 +147,13 @@ namespace Outlook2Excel.Core
             return outputDictionaryList;
         }
 
-        
+
+        //Inotifypropchanged
+
+        public event PropertyChangedEventHandler? PropertyChanged;
+
+        protected void OnPropertyChanged(string propertyName)
+            => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+
     }
 }
