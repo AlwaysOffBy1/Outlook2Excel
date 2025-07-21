@@ -16,6 +16,7 @@ namespace Outlook2Excel
         public static bool IsContainsPrimaryKey = false;
         public static int DaysToGoBack = 1;
         public static int TimerInterval = 5;
+        public static bool ImportDate = false;
 
         public static bool GetSettings()
         {
@@ -34,6 +35,7 @@ namespace Outlook2Excel
             DaysToGoBack = TryConvertToInt(config["DaysToGoBack"]) ?? DaysToGoBack;
             RegexMap = ImportEmailMappings(config);
             TimerInterval = TryConvertToInt(config["TimerInterval"]) ?? TimerInterval;
+            ImportDate = config["ImportDate"] == "true";
 
             //If any mandatory vars are null return false
             return Mailbox != null

@@ -132,17 +132,10 @@ namespace Outlook2Excel.Core
 
 
                     if (outputDictionary != null) outputDictionaryList.Add(outputDictionary);
-                    //Just a difficult way of showing the user if their primary key was found, or if they dont have one, that an email was found
-                    //if (outputDictionary == null)
-                    //{
-                    //    Console.WriteLine($"No {(AppSettings.PrimaryKey != "" ? "email" : AppSettings.PrimaryKey)} found");
-                    //}
-                    //else
-                    //{
-                    //    Console.WriteLine($"Found {(AppSettings.PrimaryKey != "" ? $"key {outputDictionary[AppSettings.PrimaryKey]}" : "email")}");
-                    //    outputDictionaryList.Add(outputDictionary);
-                    //}
                 }
+                Dictionary<string, string> dateInfo = new Dictionary<string, string>();
+                dateInfo.Add("Date", DateTime.Now.ToString("MM/dd/yy hh:mm tt"));
+                if (AppSettings.ImportDate) outputDictionaryList.Add(dateInfo);
             }
             return outputDictionaryList;
         }
