@@ -15,7 +15,8 @@ namespace Outlook2Excel.GUI
         public Form1()
         {
             InitializeComponent();
-            
+
+            Outlook2Excel.Core.AppLogger.Log.Info("Initializing tray");
             _lastRanItem = new ToolStripMenuItem("Last ran - ");
             _pauseItem = new ToolStripMenuItem("Pause", null, OnPause);
             _unpauseItem = new ToolStripMenuItem("Unpause", null, OnUnPause) { Visible = false };
