@@ -15,7 +15,7 @@ namespace Outlook2Excel.GUI
         public Form1()
         {
             InitializeComponent();
-
+            
             _lastRanItem = new ToolStripMenuItem("Last ran - ");
             _pauseItem = new ToolStripMenuItem("Pause", null, OnPause);
             _unpauseItem = new ToolStripMenuItem("Unpause", null, OnUnPause) { Visible = false };
@@ -44,6 +44,7 @@ namespace Outlook2Excel.GUI
             //Hide the main window
             this.WindowState = FormWindowState.Minimized;
             this.ShowInTaskbar = false;
+            Outlook2Excel.Core.AppLogger.Log.Info("Tray initialized sucessfully");
         }
         private void Engine_PropertyChanged(object? sender, PropertyChangedEventArgs e)
         {
@@ -58,23 +59,28 @@ namespace Outlook2Excel.GUI
 
         private void OnRunNow(object sender, EventArgs e) 
         {
+            Outlook2Excel.Core.AppLogger.Log.Info("Running...");
             _engine.RunNow();
+            Outlook2Excel.Core.AppLogger.Log.Info("Finished running");
             _lastRanItem.Text = _engine.LastRan;
         }
         private void OnPause(object sender, EventArgs e)
         {
             _engine.Pause();
+            Outlook2Excel.Core.AppLogger.Log.Info("Paused");
             _pauseItem.Visible = false;
             _unpauseItem.Visible = true;
         }
         private void OnUnPause(object sender, EventArgs e) 
         {
             _engine.UnPause();
+            Outlook2Excel.Core.AppLogger.Log.Info("Unpaused");
             _pauseItem.Visible = true;
             _unpauseItem.Visible = false;
         }
         private void OnExit(object sender, EventArgs e)
         {
+            Outlook2Excel.Core.AppLogger.Log.Info("Exiting");
             _engine.Dispose();
             _trayIcon.Visible = false;
             Application.Exit();

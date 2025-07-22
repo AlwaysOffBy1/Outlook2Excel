@@ -14,6 +14,7 @@ namespace Outlook2Excel.Core
 {
     public class Engine : IDisposable, INotifyPropertyChanged
     {
+        
         public string Progress;
         public DisposableExcel _disposableExcel;
         private Timer _timer;
@@ -36,7 +37,7 @@ namespace Outlook2Excel.Core
         {
             Progress = "Initializing";
             if (!AppSettings.GetSettings()) StaticMethods.Quit("Not all app settings were imported. Check app settings file.", 101);
-
+            
             //This opens Excel, which should stay open
             Debug.WriteLine("Opening Excel...");
             _disposableExcel = new DisposableExcel(AppSettings.ExcelFilePath);
@@ -100,8 +101,10 @@ namespace Outlook2Excel.Core
             //Each email returns a dictionary where KEY = property and VALUE = regex result
             List<Dictionary<string, string>> outputDictionaryList = new List<Dictionary<string, string>>();
 
+            Outlook2Excel.Core.AppLogger.Log.Info("Creating Outlook instance");
             using (DisposableOutlook disposableOutlook = new DisposableOutlook(AppSettings.Mailbox))
             {
+                Outlook2Excel.Core.AppLogger.Log.Info("Outlook instance created");
                 var recipient = disposableOutlook.Recipient;
                 recipient.Resolve();
                 if (!recipient.Resolved) StaticMethods.Quit("Could not access outlook", 201);
@@ -117,7 +120,7 @@ namespace Outlook2Excel.Core
                     return new List<Dictionary<string, string>>(); //need this to elimiate possible null reference of inbox warn
                 }
 
-                Console.WriteLine("Sorting inbox...");
+                Outlook2Excel.Core.AppLogger.Log.Info("Sorting inbox...");
                 string filter = $"[ReceivedTime] >= '{DateTime.Now.AddDays(0 - AppSettings.DaysToGoBack):g}'";
                 var items = inbox.Items.Restrict(filter);
 
