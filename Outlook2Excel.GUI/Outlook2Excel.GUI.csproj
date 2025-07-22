@@ -9,10 +9,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <None Remove="log4net.config" />
-  </ItemGroup>
-
-  <ItemGroup>
     <PackageReference Include="log4net" Version="3.1.0" />
   </ItemGroup>
 
@@ -21,9 +17,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Resource Include="log4net.config">
+    <None Update="log4net.config">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Resource>
+    </None>
   </ItemGroup>
 
 </Project>

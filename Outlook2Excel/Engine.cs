@@ -91,6 +91,7 @@ namespace Outlook2Excel.Core
 
         public void Dispose()
         {
+            _disposableExcel?.SaveAndClose();
             _disposableExcel?.Dispose();
         }
 
@@ -132,13 +133,12 @@ namespace Outlook2Excel.Core
 
                     //AppSettings makes sure values are not null and quits if they are
                     Dictionary<string, string>? outputDictionary = disposableOutlook.GetValueFromEmail(mi, AppSettings.RegexMap, AppSettings.PrimaryKey);
-
-
-                    if (outputDictionary != null) outputDictionaryList.Add(outputDictionary);
+                    if(outputDictionary != null)
+                    {
+                        if (AppSettings.ImportDate) outputDictionary.Add("Date", DateTime.Now.ToString("MM/dd/yy hh:mm tt"));
+                        outputDictionaryList.Add(outputDictionary);
+                    }
                 }
-                Dictionary<string, string> dateInfo = new Dictionary<string, string>();
-                dateInfo.Add("Date", DateTime.Now.ToString("MM/dd/yy hh:mm tt"));
-                if (AppSettings.ImportDate) outputDictionaryList.Add(dateInfo);
             }
             return outputDictionaryList;
         }

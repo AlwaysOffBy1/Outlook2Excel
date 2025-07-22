@@ -15,7 +15,7 @@ namespace Outlook2Excel
         public Worksheet Worksheet => _worksheet;
 
 
-        public List<string> PrimaryKeysAlreadyInExcel;
+        public List<string> PrimaryKeyValsAlreadyInExcel;
         public Dictionary<string, int> ExcelHeaders;
 
         public DisposableExcel(string path)
@@ -23,7 +23,7 @@ namespace Outlook2Excel
             if (!File.Exists(path))
                 StaticMethods.Quit("Excel file path not found", 100);
 
-            PrimaryKeysAlreadyInExcel = new List<string>();
+            PrimaryKeyValsAlreadyInExcel = new List<string>();
             ExcelHeaders = new Dictionary<string, int>();
             _excelApp = new Application();
             _excelApp.Visible = true;
@@ -46,7 +46,7 @@ namespace Outlook2Excel
             _excelApp.Quit();
         }
 
-        private void AlignDictHeadersWithExcelHeaders(string[] dataHeaders)
+        private void GetOrSetExcelHeaders(string[] dataHeaders)
         {
             //Write headers if none exist already
             if (string.IsNullOrEmpty(_worksheet.Cells[1, 1].Value2))
@@ -79,22 +79,22 @@ namespace Outlook2Excel
                 if (emailData == null || emailData.Count == 0)
                     return;
 
-                AlignDictHeadersWithExcelHeaders(emailData[0].Keys.ToArray());
+                if(ExcelHeaders.Count == 0) GetOrSetExcelHeaders(emailData[0].Keys.ToArray());
                 //Shouldn't have 2 identical primary keys, so get list of all of them before writing
                 //Since each excel file can be open by more than 1 person at a time, and can be edited by more
                 //than one person at a time, this needs to be checked each time an edit wants to happen
-                if (primaryKey != "") PrimaryKeysAlreadyInExcel = GetPrimaryKeysInExcel(_worksheet, primaryKey);
+                if (primaryKey != "") PrimaryKeyValsAlreadyInExcel = GetPrimaryKeyValsInExcel(_worksheet, primaryKey);
 
                 //Write each row of data
                 double dictRows = emailData.Count;
-                int startRow = GetLastRow();
+                int startRow = GetLastRow() +1;
                 for (int row = 0; row < dictRows; row++)
                 {
                     var dict = emailData[row];
 
                     //If primary key is already in excel skip it
                     string val = dict[primaryKey];
-                    if (PrimaryKeysAlreadyInExcel.Contains(dict[primaryKey])) continue;
+                    if (PrimaryKeyValsAlreadyInExcel.Contains(dict[primaryKey])) continue;
                     _excelApp.StatusBar = $"PROCESSING ROW {row} of {dictRows} - {(int)((row/ dictRows) *100)}%";
 
                     int i = 1;
@@ -115,7 +115,7 @@ namespace Outlook2Excel
             _excelApp.Interactive = true;
             
         }
-        private List<string> GetPrimaryKeysInExcel(Worksheet ws, string primaryKey)
+        private List<string> GetPrimaryKeyValsInExcel(Worksheet ws, string primaryKey)
         {
             List<string> colValues = new List<string>();
 

@@ -9,8 +9,9 @@ namespace Outlook2Excel.Core
 {
     public static class AppLogger
     {
-        public static readonly ILog Log = LogManager.GetLogger("AppLogger");
-        
+        public static readonly ILog Log = LogManager.GetLogger(typeof(AppLogger));
+
+
     }
-    
+
 }
