@@ -65,10 +65,13 @@ namespace Outlook2Excel.Core
             Task.Run(() =>
             {
                 //Returns a list (each email) of dictionary<string,string> (The lookup key and lookup result per email)
-                List<Dictionary<string, string>> outputDictionaryList = GetDataFromOutlook();
+                List<Dictionary<string, string>>? outputDictionaryList = GetDataFromOutlook();
 
-                //Add each email to excel
-                _disposableExcel.AddData(outputDictionaryList, AppSettings.PrimaryKey);
+                //Add each email to excel if its not null
+                if (outputDictionaryList == null) 
+                    AppLogger.Log.Warn("OUTLOOK FAILED TO GET DATA");
+                else
+                    _disposableExcel.AddData(outputDictionaryList, AppSettings.PrimaryKey);
             });
             System.Diagnostics.Debug.WriteLine("Finshed");
         }
@@ -97,54 +100,31 @@ namespace Outlook2Excel.Core
 
 
 
-        private List<Dictionary<string, string>> GetDataFromOutlook()
+        public List<Dictionary<string, string>>? GetDataFromOutlook()
         {
             //Each email returns a dictionary where KEY = property and VALUE = regex result
             List<Dictionary<string, string>> outputDictionaryList = new List<Dictionary<string, string>>();
-
+            string inboxSortFilter = $"[ReceivedTime] >= '{DateTime.Now.AddDays(0 - AppSettings.DaysToGoBack):g}'";
             Outlook2Excel.Core.AppLogger.Log.Info("Creating Outlook instance");
-            using (DisposableOutlook disposableOutlook = new DisposableOutlook(AppSettings.Mailbox))
+
+            try
             {
-                Outlook2Excel.Core.AppLogger.Log.Info("Outlook instance created");
-                var recipient = disposableOutlook.Recipient;
-                recipient.Resolve();
-                if (!recipient.Resolved) StaticMethods.Quit("Could not access outlook", 201);
-
-                Outlook.MAPIFolder? inbox = null;
-                try
+                //DisposableOutlook handles all it's child COM objects upon disposal
+                using (DisposableOutlook disposableOutlook = new DisposableOutlook(AppSettings.Mailbox, inboxSortFilter, AppSettings.RegexMap, AppSettings.PrimaryKey))
                 {
-                    inbox = disposableOutlook.Namespace.GetSharedDefaultFolder(recipient, Outlook.OlDefaultFolders.olFolderInbox);
-                }
-                catch (System.Exception ex)
-                {
-                    StaticMethods.Quit($"The mailbox {AppSettings.Mailbox} in appsettings.json is inaccessible to this PC. Please add the mailbox to Outlook and try again", 100);
-                    return new List<Dictionary<string, string>>(); //need this to elimiate possible null reference of inbox warn
-                }
-
-                Outlook2Excel.Core.AppLogger.Log.Info("Sorting inbox...");
-                string filter = $"[ReceivedTime] >= '{DateTime.Now.AddDays(0 - AppSettings.DaysToGoBack):g}'";
-                var items = inbox.Items.Restrict(filter);
-
-                //Look up regex values in each email
-                foreach (object item in items)
-                {
-                    if (item is not Outlook.MailItem mail) continue;
-                    Outlook.MailItem mi = (Outlook.MailItem)item;
-
-                    //AppSettings makes sure values are not null and quits if they are
-                    Dictionary<string, string>? outputDictionary = disposableOutlook.GetValueFromEmail(mi, AppSettings.RegexMap, AppSettings.PrimaryKey);
-                    if(outputDictionary != null)
-                    {
-                        if (AppSettings.ImportDate) outputDictionary.Add("Date", DateTime.Now.ToString("MM/dd/yy hh:mm tt"));
-                        outputDictionaryList.Add(outputDictionary);
-                    }
+                    Outlook2Excel.Core.AppLogger.Log.Info("Outlook instance created");
+                    return disposableOutlook.GetEmailListFromOutlookViaRegexLookup();
                 }
             }
-            return outputDictionaryList;
+            catch(Exception e)
+            {
+                Outlook2Excel.Core.AppLogger.Log.Error("Outlook instance failed to create.", e);
+                StaticMethods.Quit("Outlook instance failed to create.", 200);
+                
+                //This is inaccessible since StaticMethods.Quit closes the app, but requried.
+                return null;
+            }
         }
-
-
-        //Inotifypropchanged
 
         public event PropertyChangedEventHandler? PropertyChanged;
 

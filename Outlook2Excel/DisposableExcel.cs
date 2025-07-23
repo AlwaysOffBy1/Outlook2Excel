@@ -25,18 +25,30 @@ namespace Outlook2Excel
 
             PrimaryKeyValsAlreadyInExcel = new List<string>();
             ExcelHeaders = new Dictionary<string, int>();
+
             _excelApp = new Application();
             _excelApp.Visible = true;
 
-            try{
+            try
+            {
                 _workbook = _excelApp.Workbooks.Open(path, ReadOnly: false, Notify: true);
                 _worksheet = (Worksheet)_workbook.Sheets[1];
             }
-            catch (COMException ex){
-                StaticMethods.Quit("Failed to open Excel file. It might already be open.\n" + ex.Message, 301);}
+            catch (COMException ex)
+            {
+                StaticMethods.Quit("Failed to open Excel file. It might already be open.\n" + ex.Message, 301);
+                
+            }
 
-            if(_workbook == null) _workbook = new Workbook();
+            if (_workbook == null) _workbook = new Workbook();
             if(_worksheet == null) _worksheet = new Worksheet();
+
+            _excelApp.WorkbookBeforeClose += UserTriesToCloseWB;
+        }
+
+        private void UserTriesToCloseWB(Workbook Wb, ref bool Cancel)
+        {
+            Cancel = true;
         }
 
         public void SaveAndClose()
@@ -70,6 +82,7 @@ namespace Outlook2Excel
         }
         public void AddData(List<Dictionary<string, string>> emailData, string primaryKey)
         {
+
             _excelApp.ScreenUpdating = false;
             _excelApp.Interactive = false;
 
@@ -125,7 +138,7 @@ namespace Outlook2Excel
             primaryKeyCol = ExcelHeaders[primaryKey];
 
             //Get all range in PrimaryKey column
-            int bottomRow = GetLastRow();
+            int bottomRow = GetLastRow(primaryKeyCol);
             Microsoft.Office.Interop.Excel.Range primaryKeyRange = ws.Columns[primaryKeyCol];
             object[,]? values = primaryKeyRange.Value2 as object[,];
             if(values == null) return new List<string>();
@@ -140,11 +153,12 @@ namespace Outlook2Excel
             colValues = colValues.Distinct().ToList();
             return colValues;
         }
-        private int GetLastRow()
+        private int GetLastRow(int column = 1)
         {
-            Microsoft.Office.Interop.Excel.Range lastCell = _worksheet.Cells[_worksheet.Rows.Count, 1];
+            Microsoft.Office.Interop.Excel.Range lastCell = _worksheet.Cells[_worksheet.Rows.Count, column];
             Microsoft.Office.Interop.Excel.Range lastUsed = lastCell.End[XlDirection.xlUp];
 
+            AppLogger.Log.Info($"Last used row found at {lastUsed.Row}.");
             int lastRow = lastUsed.Row;
 
             // Avoid writing over data
