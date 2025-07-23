@@ -11,6 +11,7 @@ using System.Text.RegularExpressions;
 using Outlook2Excel.Core;
 using Microsoft.Office.Interop.Outlook;
 using Exception = System.Exception;
+using System.Diagnostics;
 
 namespace Outlook2Excel
 {
@@ -30,7 +31,7 @@ namespace Outlook2Excel
         private bool _disposed = false;
 
         #pragma warning disable CS8618 //Program doesn't continue if any field is null, so the warn is not required
-        public DisposableOutlook(string mailbox, string? inboxSortFilter, Dictionary<string,string> regexMap, string? primaryKey)
+        public DisposableOutlook(string mailbox, string? subFolder, string? inboxSortFilter, Dictionary<string,string> regexMap, string? primaryKey)
         #pragma warning restore CS8618 //Program doesn't continue if any field is null, so the warn is not required
         {
             //if provided sort filter is blank, set to "look at all emails within the past x days" where x is in Appsettings.json
@@ -60,10 +61,14 @@ namespace Outlook2Excel
                 catch (Exception ex){
                     throw new Exception("Failed to create recipient for mailbox: " + mailbox, ex);}
 
+                if (!_recipient.Resolved)
+                    throw new Exception("Recipient could not be resolved");
+
                 try{
-                    _inbox = _namespace.GetSharedDefaultFolder(_recipient, Outlook.OlDefaultFolders.olFolderInbox);}
+                    _inbox = SetInboxSubfolder(mailbox, subFolder);
+                }
                 catch (Exception ex){
-                    throw new Exception($"The mailbox \"{AppSettings.Mailbox}\" in appsettings.json is inaccessible to this PC.\n\n Please fix the name to an accessible mailbox and try again.", ex);}
+                    throw new Exception($"The mailbox \"{mailbox}{(subFolder == "" || subFolder == null ? $"": $"/Inbox/{subFolder}")}\" in appsettings.json are inaccessible to this PC.\n\n Please fix the name to an accessible mailbox and try again.", ex);}
 
                 try{
                     _items = _inbox.Items.Restrict(InboxSortFilter);}
@@ -71,13 +76,9 @@ namespace Outlook2Excel
                     throw new Exception("Failed to apply filter to inbox items: " + InboxSortFilter, ex);}
 
                 try{
-                    _currentMailItem = _items[0];}
+                    _currentMailItem = _items[1];}
                 catch (Exception ex){
                     throw new Exception("Failed to retrieve first mail item from filtered inbox", ex);}
-
-
-                if (!_recipient.Resolved)
-                    throw new Exception("Recipient could not be resolved");
 
                 //Add all objects to a list to make disposing less lines of code
                 COM_OBJECTS.AddRange(new List<object?>
@@ -99,12 +100,65 @@ namespace Outlook2Excel
 
 
         }      
+        private Outlook.MAPIFolder SetInboxSubfolder(string mailbox, string? subfolder)
+        {
+            //Double-check nulls
+            if (_namespace == null) 
+                throw new Exception("Namespace is null while trying to access folder");
+            if (_recipient == null)
+                throw new Exception("Recipient is null while trying to access folder");
+
+            if (subfolder == "" || subfolder == null) return _namespace.GetSharedDefaultFolder(_recipient, Outlook.OlDefaultFolders.olFolderInbox);
+
+            if (!_recipient.Resolved)
+                throw new Exception("Recipient not resolved while trying to access folder");
+
+            //Get root dir
+            var root = _namespace.GetSharedDefaultFolder(_recipient, Outlook.OlDefaultFolders.olFolderInbox).Parent as Outlook.MAPIFolder
+                        ?? throw new Exception("Unable to get mailbox root");
+            var current = root;
+
+            bool found = false;
+
+            //Loop through folders and subfolders for the proper name in appconfig.json
+            foreach (var part in subfolder.Split('/'))
+            {
+                Debug.WriteLine("Part: " + part);
+                _ = current.Folders.Count; //force load
+                
+                string s = current.Name;
+
+                for (int i = 1; i <= current.Folders.Count; i++)
+                {
+                    var folder = current.Folders[i];
+                    Debug.WriteLine("    Folder: " + folder.Name);
+
+                    if (folder.Name.Equals(part, StringComparison.OrdinalIgnoreCase))
+                    {
+                        current = folder;
+                        found = true;
+                        break;
+                    }
+                    DisposeObject(folder);
+                    
+                }   
+            }
+            DisposeObject (root);
+            DisposeObject (subfolder);
+            DisposeObject (current);
+
+
+            if (!found) return _namespace.GetSharedDefaultFolder(_recipient, Outlook.OlDefaultFolders.olFolderInbox); ;
+            return current;
+
+
+        }
 
         public List<Dictionary<string, string>>? GetEmailListFromOutlookViaRegexLookup()
         {
             List<Dictionary<string,string>> outputDictionaryList = new List<Dictionary<string,string>>();
             if (_currentMailItem == null || _items == null) return null;
-            for (int i = 0; i < _items.Count; i++)
+            for (int i = 1; i < _items.Count; i++)
             {
                 if (_items[i] is not Outlook.MailItem mail) continue;
                 _currentMailItem = _items[i];
@@ -161,6 +215,14 @@ namespace Outlook2Excel
             GC.SuppressFinalize(this);
         }  
 
+        protected void DisposeObject(object? o)
+        {
+            if (o != null)
+            {
+                Marshal.ReleaseComObject(o);
+                o = null;
+            }
+        }
         protected virtual void Dispose(bool disposing)
         {
             if (_disposed) return;
@@ -168,12 +230,7 @@ namespace Outlook2Excel
             //Release unmanaged COM objects
             for (int i = 0; i < COM_OBJECTS.Count; i++)
             {
-                object? o = COM_OBJECTS[i];
-                if (o != null)
-                {
-                    Marshal.ReleaseComObject(o);
-                    COM_OBJECTS[i] = null; 
-                }
+                DisposeObject(COM_OBJECTS[i]);
             }
             _disposed = true;
         }

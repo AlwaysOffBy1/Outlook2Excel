@@ -110,10 +110,20 @@ namespace Outlook2Excel.Core
             try
             {
                 //DisposableOutlook handles all it's child COM objects upon disposal
-                using (DisposableOutlook disposableOutlook = new DisposableOutlook(AppSettings.Mailbox, inboxSortFilter, AppSettings.RegexMap, AppSettings.PrimaryKey))
+                using (DisposableOutlook disposableOutlook = new DisposableOutlook(AppSettings.Mailbox,AppSettings.SubFolder, inboxSortFilter, AppSettings.RegexMap, AppSettings.PrimaryKey))
                 {
                     Outlook2Excel.Core.AppLogger.Log.Info("Outlook instance created");
-                    return disposableOutlook.GetEmailListFromOutlookViaRegexLookup();
+                    try
+                    {
+                        return disposableOutlook.GetEmailListFromOutlookViaRegexLookup();
+                    }
+                    catch(Exception e)
+                    {
+                        Outlook2Excel.Core.AppLogger.Log.Error("Outlook could not get emails", e);
+                        StaticMethods.Quit("Outlook could not get emails", 200);
+                        return null;
+                    }
+                    
                 }
             }
             catch(Exception e)

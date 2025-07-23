@@ -17,6 +17,7 @@ namespace Outlook2Excel
         public static int DaysToGoBack = 1;
         public static int TimerInterval = 5;
         public static bool ImportDate = false;
+        public static string? SubFolder;
 
         public static bool GetSettings()
         {
@@ -36,6 +37,7 @@ namespace Outlook2Excel
             RegexMap = ImportEmailMappings(config);
             TimerInterval = TryConvertToInt(config["TimerInterval"]) ?? TimerInterval;
             ImportDate = config["ImportDate"] == "true";
+            SubFolder = config["SubFolder"] ?? string.Empty;
 
             //If any mandatory vars are null return false
             return Mailbox != null
