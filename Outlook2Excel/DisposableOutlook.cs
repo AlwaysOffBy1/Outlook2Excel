@@ -106,7 +106,7 @@ namespace Outlook2Excel
             if (_recipient == null)
                 throw new Exception("Recipient is null while trying to access folder");
 
-            if (subfolder == "" || subfolder == null) return _namespace.GetSharedDefaultFolder(_recipient, Outlook.OlDefaultFolders.olFolderInbox);
+            if (string.IsNullOrEmpty(subfolder)) return _namespace.GetSharedDefaultFolder(_recipient, Outlook.OlDefaultFolders.olFolderInbox);
 
             if (!_recipient.Resolved)
                 throw new Exception("Recipient not resolved while trying to access folder");
