@@ -10,6 +10,7 @@ namespace Outlook2Excel
         private Workbook _workbook;
         private Worksheet _worksheet;
         private bool _disposed = false;
+        public bool IsProgramInitiatedClose = false;
         public Application App => _excelApp;
         public Workbook Workbook => _workbook;
         public Worksheet Worksheet => _worksheet;
@@ -42,16 +43,17 @@ namespace Outlook2Excel
             if (_workbook == null) _workbook = new Workbook();
             if(_worksheet == null) _worksheet = new Worksheet();
 
-            _excelApp.WorkbookBeforeClose += UserTriesToCloseWB;
+            _excelApp.WorkbookBeforeClose += IsUserTryingToCloseWB;
         }
 
-        private void UserTriesToCloseWB(Workbook Wb, ref bool Cancel)
+        private void IsUserTryingToCloseWB(Workbook Wb, ref bool Cancel)
         {
-            Cancel = true;
+            Cancel = !IsProgramInitiatedClose;
         }
 
         public void SaveAndClose()
         {
+            IsProgramInitiatedClose = true;
             _workbook.Save();
             _workbook.Close(false);
             _excelApp.Quit();

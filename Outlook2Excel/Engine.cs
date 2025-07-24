@@ -50,11 +50,7 @@ namespace Outlook2Excel.Core
         
         public string GetStatus() { return Progress; }
 
-        public void Dispose()
-        {
-            _disposableExcel?.SaveAndClose();
-            _disposableExcel?.Dispose();
-        }
+        
 
         public string CreateSortFilters(int daysToGoBack, string subjectFilter, string fromFilter)
         {
@@ -112,6 +108,12 @@ namespace Outlook2Excel.Core
                 //This is inaccessible since StaticMethods.Quit closes the app, but requried.
                 return null;
             }
+        }
+
+        public void Dispose()
+        {
+            _disposableExcel.SaveAndClose();
+            _disposableExcel.Dispose();
         }
     }
 }

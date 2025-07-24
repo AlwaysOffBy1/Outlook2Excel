@@ -74,7 +74,11 @@ namespace Outlook2Excel
                     throw new Exception("Failed to apply filter to inbox items: " + InboxSortFilter, ex);}
 
                 try{
-                    _currentMailItem = _items[1];}
+                    if (_items.Count != 0)
+                        _currentMailItem = _items[1];
+                    else
+                        _currentMailItem = null;
+                }
                 catch (Exception ex){
                     throw new Exception("Failed to retrieve first mail item from filtered inbox", ex);}
 
