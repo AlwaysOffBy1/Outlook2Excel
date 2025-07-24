@@ -1,17 +1,18 @@
 ﻿using System;
+using System;
+using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
-using System.Threading.Tasks;
-using System;
-using Outlook = Microsoft.Office.Interop.Outlook;
 using System.Text.RegularExpressions;
-using Outlook2Excel.Core;
+using System.Threading.Tasks;
 using Microsoft.Office.Interop.Outlook;
+using Outlook2Excel.Core;
 using Exception = System.Exception;
-using System.Diagnostics;
+using Outlook = Microsoft.Office.Interop.Outlook;
 
 namespace Outlook2Excel
 {
@@ -159,36 +160,52 @@ namespace Outlook2Excel
         public List<Dictionary<string, string>>? GetEmailListFromOutlookViaRegexLookup()
         {
             List<Dictionary<string,string>> outputDictionaryList = new List<Dictionary<string,string>>();
-            if (_currentMailItem == null || _items == null) return null;
+            //_items could not be properly populated because it does not exist
+            if (_items == null) return null;
+            //_currentItem is null because items exists, but is empty
+            if(_currentMailItem == null) return outputDictionaryList;
             for (int i = 1; i < _items.Count; i++)
             {
                 if (_items[i] is not Outlook.MailItem mail) continue;
                 _currentMailItem = _items[i];
 
                 Dictionary<string, string>? outputDictionary = GetValueFromEmail();
+                //If outlook found a matching email and got the regex results
                 if (outputDictionary != null)
                 {
-                    outputDictionaryList.Add(outputDictionary);
+                     outputDictionaryList.Add(outputDictionary);
                 }
             }
-            return outputDictionaryList;
+
+            var output = outputDictionaryList
+                .DistinctBy(d => d[PrimaryKey])                                // remove duplicates by PrimaryKey value
+                .OrderBy(d => d.TryGetValue(d[AppSettings.OrganizeBy], out var val) ? val : "") // order by Date
+                .ToList();
+
+            //testing
+            foreach (var el in output)
+            {
+                Debug.WriteLine("Primary Key = " + el[PrimaryKey]);
+            }
+
+            return output;
         }
         private Dictionary<string,string>? GetValueFromEmail()
         {
             Dictionary<string,string> output = new Dictionary<string,string>();
             if (_currentMailItem == null) throw new Exception("Current mail item is null. Outlook can not access a null mail item");
             string message = _currentMailItem.Subject + "\n\n" + _currentMailItem.Body;
-            
+
+            output.Add("Subject", _currentMailItem.Subject);
+            output.Add("Body", _currentMailItem.Body);
+            output.Add("EmailDate", _currentMailItem.ReceivedTime.ToString("MM/dd/yyyy hh:mm tt"));
+
             //Before doing anything, if we have a primary key, check the email for it first
             if (PrimaryKey != "")
             {
                 output.Add(PrimaryKey, EmailRegexSearchFor(message, RegexMap[PrimaryKey]) ?? "");
                 if (output[PrimaryKey] == "" || output[PrimaryKey] == null) return null;
             }
-
-            if(AppSettings.ImportDate) output.Add("Date", _currentMailItem.ReceivedTime.ToString("MM/dd/yyyy hh:mm tt"));
-            output.Add("Subject", _currentMailItem.Subject);
-            output.Add("Body", _currentMailItem.Body);
 
             //Loop through regex map to search for properties
             foreach (var pair in RegexMap) 

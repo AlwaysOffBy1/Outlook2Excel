@@ -83,9 +83,17 @@ namespace Outlook2Excel
         }
         public void AddData(List<Dictionary<string, string>> emailData, string primaryKey)
         {
-
-            _excelApp.ScreenUpdating = false;
-            _excelApp.Interactive = false;
+            try
+            {
+                _excelApp.ScreenUpdating = false;
+                _excelApp.Interactive = false;
+            }
+            catch(Exception ex)
+            {
+                AppLogger.Log.Warn("Excel was being edited while cells were trying to be inserted. Aborting upload and trying again after timer.");
+                return;
+            }
+            
 
             //Dont like large try's, but user can interfere at any time in so many ways
             try
@@ -97,25 +105,25 @@ namespace Outlook2Excel
                 //Shouldn't have 2 identical primary keys, so get list of all of them before writing
                 //Since each excel file can be open by more than 1 person at a time, and can be edited by more
                 //than one person at a time, this needs to be checked each time an edit wants to happen
-                if (primaryKey != "") PrimaryKeyValsAlreadyInExcel = GetPrimaryKeyValsInExcel(_worksheet, primaryKey);
+                if (primaryKey != "") PrimaryKeyValsAlreadyInExcel = GetPrimaryKeyValsInExcel(_worksheet, primaryKey).Distinct().ToList();
 
                 //Write each row of data
                 double dictRows = emailData.Count;
                 int startRow = GetLastRow() +1;
                 for (int row = 0; row < dictRows; row++)
                 {
-                    var dict = emailData[row];
+                    var currentDict = emailData[row];
 
                     //If primary key is already in excel skip it
-                    string val = dict[primaryKey];
-                    if (PrimaryKeyValsAlreadyInExcel.Contains(dict[primaryKey])) continue;
+                    string val = currentDict[primaryKey];
+                    if (PrimaryKeyValsAlreadyInExcel.Contains(currentDict[primaryKey])) continue;
                     _excelApp.StatusBar = $"PROCESSING ROW {row} of {dictRows} - {(int)((row/ dictRows) *100)}%";
 
                     int i = 1;
-                    foreach (var key in dict.Keys)
+                    foreach (var key in currentDict.Keys)
                     {
                         if(ExcelHeaders.Keys.Contains(key))
-                            _worksheet.Cells[startRow + row, ExcelHeaders[key]] = dict[key];
+                            _worksheet.Cells[startRow + row, ExcelHeaders[key]] = currentDict[key];
                     }
                 }
             }

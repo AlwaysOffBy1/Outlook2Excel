@@ -10,16 +10,16 @@ namespace Outlook2Excel
     public static class AppSettings
     {
         public static string Mailbox { get; private set; } = "";
-        public static string PrimaryKey { get; private set; } = "";
+        public static string PrimaryKey { get; private set; } = "Subject";
         public static string ExcelFilePath { get; private set; } = "";
         public static Dictionary<string, string> RegexMap { get; set; } = new Dictionary<string, string>();
         public static bool IsContainsPrimaryKey { get; private set; } = false;
         public static int DaysToGoBack { get; set; } = 1;
         public static int TimerInterval { get; set; } = 5;
-        public static bool ImportDate { get; private set; } = false;
         public static string SubFolder { get; private set; } = "";
         public static string SubjectFilter { get; private set; } = "";
         public static string FromFilter { get; private set; } = "";
+        public static string OrganizeBy { get; private set; } = "EmailDate";
 
         public static bool GetSettings()
         {
@@ -32,16 +32,16 @@ namespace Outlook2Excel
 
             //Set vars
             Mailbox = config["Mailbox"] ?? "";
-            PrimaryKey = config["PrimaryKey"] ?? "";
+            PrimaryKey = config["PrimaryKey"] ?? "Subject";
             IsContainsPrimaryKey = PrimaryKey != "";
             ExcelFilePath = config["ExcelFilePath"] ?? "";
             DaysToGoBack = TryConvertToInt(config["DaysToGoBack"]) ?? DaysToGoBack;
             RegexMap = ImportEmailMappings(config);
             TimerInterval = TryConvertToInt(config["TimerInterval"]) ?? TimerInterval;
-            ImportDate = config["ImportDate"] == "true";
             SubFolder = config["SubFolder"] ?? string.Empty;
             SubjectFilter = config["SubjectFilter"] ?? string.Empty;
             FromFilter = config["FromFilter"] ?? string.Empty;
+            OrganizeBy = config["OrganizeBy"] ?? "EmailDate";
 
             //If any mandatory vars are null return false
             return Mailbox != null

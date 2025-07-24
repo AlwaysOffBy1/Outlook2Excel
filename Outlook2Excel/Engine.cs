@@ -40,9 +40,14 @@ namespace Outlook2Excel.Core
 
                 //Add each email to excel if its not null
                 if (outputDictionaryList == null) 
-                    AppLogger.Log.Warn("OUTLOOK FAILED TO GET DATA");
+                    AppLogger.Log.Warn("Outlook failed to load");
                 else
+                {
+                    if (outputDictionaryList.Count == 0)
+                        AppLogger.Log.Warn("Outlook did not match any emails with the search criteria provided in appsettings.json");
                     _disposableExcel.AddData(outputDictionaryList, AppSettings.PrimaryKey);
+                }
+                    
             });
             IsRunning = false;
             System.Diagnostics.Debug.WriteLine("Finshed");
