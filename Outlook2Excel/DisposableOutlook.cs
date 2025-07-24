@@ -29,13 +29,11 @@ namespace Outlook2Excel
         public string PrimaryKey {  get; set; }
 
         private bool _disposed = false;
-
-        #pragma warning disable CS8618 //Program doesn't continue if any field is null, so the warn is not required
         public DisposableOutlook(string mailbox, string? subFolder, string? inboxSortFilter, Dictionary<string,string> regexMap, string? primaryKey)
-        #pragma warning restore CS8618 //Program doesn't continue if any field is null, so the warn is not required
         {
             //if provided sort filter is blank, set to "look at all emails within the past x days" where x is in Appsettings.json
             InboxSortFilter = inboxSortFilter ?? $"[ReceivedTime] >= '{DateTime.Now.AddDays(0 - AppSettings.DaysToGoBack):g}'";
+            
             COM_OBJECTS = new List<object?>();
             RegexMap = regexMap ?? new Dictionary<string,string>();
             PrimaryKey = primaryKey ?? "";

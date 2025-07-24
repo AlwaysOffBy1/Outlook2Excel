@@ -1,11 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Security.Cryptography.X509Certificates;
-using System.Text;
-using System.Threading.Tasks;
-using Timer = System.Timers.Timer;
-using Outlook = Microsoft.Office.Interop.Outlook;
+﻿using Timer = System.Timers.Timer;
 using System.Timers;
 using System.Diagnostics;
 using System.ComponentModel;
@@ -19,12 +12,25 @@ namespace Outlook2Excel.Core
         public DisposableExcel _disposableExcel;
         private Timer _timer;
         private string lastRan = "";
+        private bool isRunning;
+
+        public bool IsRunning
+        {
+            get => isRunning;
+            set {
+                if (isRunning != value)
+                {
+                    isRunning = value;
+                    OnPropertyChanged(nameof(IsRunning));
+                }
+            }
+        }
+
 
         public string LastRan
         {
             get => lastRan;
-            set 
-            {
+            set {
                 if (lastRan != value)
                 {
                     lastRan = value;
@@ -61,6 +67,7 @@ namespace Outlook2Excel.Core
         public void RunNow() 
         {
             System.Diagnostics.Debug.WriteLine("Starting now...");
+            IsRunning = true;
             //Prevent UI lockup with Task.Run
             Task.Run(() =>
             {
@@ -73,6 +80,7 @@ namespace Outlook2Excel.Core
                 else
                     _disposableExcel.AddData(outputDictionaryList, AppSettings.PrimaryKey);
             });
+            IsRunning = false;
             System.Diagnostics.Debug.WriteLine("Finshed");
         }
         public void Pause() 
@@ -105,12 +113,13 @@ namespace Outlook2Excel.Core
             //Each email returns a dictionary where KEY = property and VALUE = regex result
             List<Dictionary<string, string>> outputDictionaryList = new List<Dictionary<string, string>>();
             string inboxSortFilter = $"[ReceivedTime] >= '{DateTime.Now.AddDays(0 - AppSettings.DaysToGoBack):g}'";
+            if (!string.IsNullOrEmpty(AppSettings.SubjectFilter)) inboxSortFilter += $" AND [Subject] LIKE '%{AppSettings.SubjectFilter}%'";
             Outlook2Excel.Core.AppLogger.Log.Info("Creating Outlook instance");
 
             try
             {
                 //DisposableOutlook handles all it's child COM objects upon disposal
-                using (DisposableOutlook disposableOutlook = new DisposableOutlook(AppSettings.Mailbox,AppSettings.SubFolder, inboxSortFilter, AppSettings.RegexMap, AppSettings.PrimaryKey))
+                using (DisposableOutlook disposableOutlook = new DisposableOutlook(AppSettings.Mailbox, AppSettings.SubFolder, inboxSortFilter, AppSettings.RegexMap, AppSettings.PrimaryKey))
                 {
                     Outlook2Excel.Core.AppLogger.Log.Info("Outlook instance created");
                     try

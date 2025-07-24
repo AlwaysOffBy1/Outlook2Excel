@@ -60,6 +60,11 @@ namespace Outlook2Excel.GUI
 
         private void OnRunNow(object sender, EventArgs e) 
         {
+            if (_engine.IsRunning)
+            {
+                Outlook2Excel.Core.AppLogger.Log.Info("User initiated run while program already running");
+                return;
+            }
             Outlook2Excel.Core.AppLogger.Log.Info("Running...");
             _engine.RunNow();
             Outlook2Excel.Core.AppLogger.Log.Info("Finished running");

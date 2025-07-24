@@ -18,6 +18,7 @@ namespace Outlook2Excel
         public static int TimerInterval = 5;
         public static bool ImportDate = false;
         public static string? SubFolder;
+        public static string? SubjectFilter;
 
         public static bool GetSettings()
         {
@@ -38,6 +39,7 @@ namespace Outlook2Excel
             TimerInterval = TryConvertToInt(config["TimerInterval"]) ?? TimerInterval;
             ImportDate = config["ImportDate"] == "true";
             SubFolder = config["SubFolder"] ?? string.Empty;
+            SubjectFilter = config["SubjectFilter"] ?? string.Empty;
 
             //If any mandatory vars are null return false
             return Mailbox != null
