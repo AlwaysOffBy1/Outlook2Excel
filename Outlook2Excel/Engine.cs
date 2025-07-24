@@ -60,34 +60,31 @@ namespace Outlook2Excel.Core
         {
             var filters = new List<string>();
 
-            //Always filter by received time
             string dateFilter = DateTime.Now
                 .AddDays(0 - daysToGoBack)
                 .ToString("yyyy-MM-dd HH:mm");
 
-            filters.Add($@"""urn:schemas:httpmail:datereceived"" >= '{dateFilter}'");
+            filters.Add($@"(""urn:schemas:httpmail:datereceived"" >= '{dateFilter}')");
 
-            //Subject filter
             if (!string.IsNullOrWhiteSpace(subjectFilter))
             {
-                filters.Add($@"""urn:schemas:httpmail:subject"" LIKE '%{AppSettings.SubjectFilter}%'");
+                filters.Add($@"(""urn:schemas:httpmail:subject"" LIKE '%{subjectFilter}%')");
             }
 
-            //From filter (if provided)
-            if (!string.IsNullOrWhiteSpace(AppSettings.FromFilter))
+            if (!string.IsNullOrWhiteSpace(fromFilter))
             {
-                filters.Add($@"""urn:schemas:httpmail:fromemail"" LIKE '%{AppSettings.FromFilter}%'");
+                filters.Add($@"(""urn:schemas:httpmail:fromemail"" LIKE '%{fromFilter}%')");
             }
 
-            // Join filters with AND, then wrap in @SQL
-            return $@"@SQL=""{string.Join(" AND ", filters)}""";
+            return $@"@SQL={string.Join(" AND ", filters)}";
         }
+
+
         public List<Dictionary<string, string>>? GetDataFromOutlook()
         {
             //Each email returns a dictionary where KEY = property and VALUE = regex result
             List<Dictionary<string, string>> outputDictionaryList = new List<Dictionary<string, string>>();
             string inboxSortFilter = CreateSortFilters(AppSettings.DaysToGoBack, AppSettings.SubjectFilter, AppSettings.FromFilter);
-            if (!string.IsNullOrEmpty(AppSettings.SubjectFilter)) inboxSortFilter += $" AND [Subject] LIKE '%{AppSettings.SubjectFilter}%'";
             Outlook2Excel.Core.AppLogger.Log.Info("Creating Outlook instance");
 
             try
