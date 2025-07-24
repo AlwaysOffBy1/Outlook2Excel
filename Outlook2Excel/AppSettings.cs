@@ -7,7 +7,7 @@ using Microsoft.Extensions.Configuration;
 
 namespace Outlook2Excel
 {
-    static class AppSettings
+    public static class AppSettings
     {
         public static string? Mailbox;
         public static string? PrimaryKey;

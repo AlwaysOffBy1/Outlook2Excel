@@ -93,7 +93,7 @@ namespace Outlook2Excel
             catch (Exception ex)
             {
                 Dispose();
-                StaticMethods.Quit(ex.ToString(), 200);
+                StaticMethods.Quit("Unable to boot up Outlook", 200, ex);
             }
 
 

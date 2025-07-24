@@ -21,7 +21,7 @@ namespace Outlook2Excel
         public DisposableExcel(string path)
         {
             if (!File.Exists(path))
-                StaticMethods.Quit("Excel file path not found", 100);
+                StaticMethods.Quit("Excel file path not found", 100, null);
 
             PrimaryKeyValsAlreadyInExcel = new List<string>();
             ExcelHeaders = new Dictionary<string, int>();
@@ -36,8 +36,7 @@ namespace Outlook2Excel
             }
             catch (COMException ex)
             {
-                StaticMethods.Quit("Failed to open Excel file. It might already be open.\n" + ex.Message, 301);
-                
+                StaticMethods.Quit("Failed to open Excel file. It might already be open.\n" + ex.Message, 301, null);
             }
 
             if (_workbook == null) _workbook = new Workbook();
@@ -120,8 +119,7 @@ namespace Outlook2Excel
             }
             catch(Exception ex)
             {
-                Console.WriteLine(ex.ToString());
-                StaticMethods.Quit(ex.Message, 301);
+                StaticMethods.Quit("Generic Excel Error after load", 301, ex);
             }
             _excelApp.StatusBar = "PROCESSING DONE";
             _excelApp.ScreenUpdating = true;

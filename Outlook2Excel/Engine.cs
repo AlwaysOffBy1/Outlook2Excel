@@ -1,67 +1,31 @@
-﻿using Timer = System.Timers.Timer;
+﻿
 using System.Timers;
 using System.Diagnostics;
 using System.ComponentModel;
 
 namespace Outlook2Excel.Core
 {
-    public class Engine : IDisposable, INotifyPropertyChanged
+    public class Engine : IDisposable
     {
         
         public string Progress;
         public DisposableExcel _disposableExcel;
-        private Timer _timer;
         private string lastRan = "";
         private bool isRunning;
 
-        public bool IsRunning
-        {
-            get => isRunning;
-            set {
-                if (isRunning != value)
-                {
-                    isRunning = value;
-                    OnPropertyChanged(nameof(IsRunning));
-                }
-            }
-        }
-
-
-        public string LastRan
-        {
-            get => lastRan;
-            set {
-                if (lastRan != value)
-                {
-                    lastRan = value;
-                    OnPropertyChanged(nameof(LastRan));
-                }
-            }
-        }
+        public bool IsRunning = false;
 
         public Engine() 
         {
-            Progress = "Initializing";
-            if (!AppSettings.GetSettings()) StaticMethods.Quit("Not all app settings were imported. Check app settings file.", 101);
-            
+            AppLogger.Log.Info("Initializing engine");
+            if (!AppSettings.GetSettings()) StaticMethods.Quit("Not all app settings were imported. Check app settings file.", 101, null);
+
             //This opens Excel, which should stay open
-            Debug.WriteLine("Opening Excel...");
+            AppLogger.Log.Info("Opening Excel");
             _disposableExcel = new DisposableExcel(AppSettings.ExcelFilePath);
-
-            _timer = new Timer(AppSettings.TimerInterval * 60 * 1000); //5 minutes is default
-            _timer.AutoReset = true;
-            _timer.Elapsed += TimerTicked;
-            _timer.Enabled = true;
-            _timer.Start();
-            
-            Progress = "Initialized";
         }
 
-        private void TimerTicked(object sender, ElapsedEventArgs e)
-        {
-            RunNow();
-            LastRan = $"Last ran - {DateTime.Now.ToString("MM/dd/yy - hh:mm tt")}";
-        }
+        
 
         //Public API
         public void RunNow() 
@@ -83,21 +47,7 @@ namespace Outlook2Excel.Core
             IsRunning = false;
             System.Diagnostics.Debug.WriteLine("Finshed");
         }
-        public void Pause() 
-        { 
-            _timer.Stop();
-        }
-        public void UnPause()
-        {
-            _timer.Start();
-        }
-        public void SetRunInterval(int intervalInMinutes)
-        {
-            _timer.Stop();
-            if(intervalInMinutes <= 0) intervalInMinutes = AppSettings.TimerInterval;
-            _timer.Interval = intervalInMinutes;
-            _timer.Start();
-        }
+        
         public string GetStatus() { return Progress; }
 
         public void Dispose()
@@ -105,9 +55,6 @@ namespace Outlook2Excel.Core
             _disposableExcel?.SaveAndClose();
             _disposableExcel?.Dispose();
         }
-
-
-
         public List<Dictionary<string, string>>? GetDataFromOutlook()
         {
             //Each email returns a dictionary where KEY = property and VALUE = regex result
@@ -126,29 +73,21 @@ namespace Outlook2Excel.Core
                     {
                         return disposableOutlook.GetEmailListFromOutlookViaRegexLookup();
                     }
-                    catch(Exception e)
+                    catch(Exception ex)
                     {
-                        Outlook2Excel.Core.AppLogger.Log.Error("Outlook could not get emails", e);
-                        StaticMethods.Quit("Outlook could not get emails", 200);
+                        StaticMethods.Quit("Outlook could not get emails", 200, ex);
+                        //This is inaccessible since StaticMethods.Quit closes the app, but requried.
                         return null;
                     }
                     
                 }
             }
-            catch(Exception e)
+            catch(Exception ex)
             {
-                Outlook2Excel.Core.AppLogger.Log.Error("Outlook instance failed to create.", e);
-                StaticMethods.Quit("Outlook instance failed to create.", 200);
-                
+                StaticMethods.Quit("Outlook instance failed to create.", 200, ex);
                 //This is inaccessible since StaticMethods.Quit closes the app, but requried.
                 return null;
             }
         }
-
-        public event PropertyChangedEventHandler? PropertyChanged;
-
-        protected void OnPropertyChanged(string propertyName)
-            => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-
     }
 }
