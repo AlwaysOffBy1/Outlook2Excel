@@ -21,7 +21,7 @@ namespace Outlook2Excel
         private Outlook.Application? _outlookApp;
         private Outlook.NameSpace? _namespace;
         private Outlook.Recipient? _recipient;
-        private Outlook.MAPIFolder? _inbox;
+        private Outlook.Folder? _folder;
         private Outlook.Items? _items;
         private Outlook.MailItem? _currentMailItem;
         private List<object?> COM_OBJECTS;
@@ -30,7 +30,7 @@ namespace Outlook2Excel
         public string PrimaryKey {  get; set; }
 
         private bool _disposed = false;
-        public DisposableOutlook(string mailbox, string? subFolder, string? inboxSortFilter, Dictionary<string,string> regexMap, string? primaryKey)
+        public DisposableOutlook(string mailbox, string subFolder, string? inboxSortFilter, Dictionary<string,string> regexMap, string? primaryKey)
         {
             //if provided sort filter is blank, set to "look at all emails within the past x days" where x is in Appsettings.json
             InboxSortFilter = inboxSortFilter ?? $"[ReceivedTime] >= '{DateTime.Now.AddDays(0 - AppSettings.DaysToGoBack):g}'";
@@ -64,13 +64,14 @@ namespace Outlook2Excel
                     throw new Exception("Recipient could not be resolved");
 
                 try{
-                    _inbox = SetInboxSubfolder(mailbox, subFolder);
+                    //HATE not just assigning variable, but this makes COM disposal 100x easier
+                    if (!_SetMailboxFolder(mailbox, subFolder)) throw new Exception();
                 }
                 catch (Exception ex){
                     throw new Exception($"The mailbox \"{mailbox}{(subFolder == "" || subFolder == null ? $"": $"/Inbox/{subFolder}")}\" in appsettings.json are inaccessible to this PC.\n\n Please fix the name to an accessible mailbox and try again.", ex);}
 
                 try{
-                    _items = _inbox.Items.Restrict(InboxSortFilter);}
+                    _items = _folder.Items.Restrict(InboxSortFilter);}
                 catch (Exception ex){
                     throw new Exception("Failed to apply filter to inbox items: " + InboxSortFilter, ex);}
 
@@ -89,7 +90,7 @@ namespace Outlook2Excel
                     _outlookApp, 
                     _namespace, 
                     _recipient, 
-                    _inbox, 
+                    _folder, 
                     _currentMailItem
                 });
 
@@ -102,59 +103,60 @@ namespace Outlook2Excel
             }
 
 
-        }      
-        private Outlook.MAPIFolder SetInboxSubfolder(string mailbox, string? subfolder)
+        }
+        private bool _SetMailboxFolder(string mailboxName, string subfolderName)
         {
-            //Double-check nulls
-            if (_namespace == null) 
-                throw new Exception("Namespace is null while trying to access folder");
-            if (_recipient == null)
-                throw new Exception("Recipient is null while trying to access folder");
-
-            if (string.IsNullOrEmpty(subfolder)) return _namespace.GetSharedDefaultFolder(_recipient, Outlook.OlDefaultFolders.olFolderInbox);
-
-            if (!_recipient.Resolved)
-                throw new Exception("Recipient not resolved while trying to access folder");
-
-            //Get root dir
-            var root = _namespace.GetSharedDefaultFolder(_recipient, Outlook.OlDefaultFolders.olFolderInbox).Parent as Outlook.MAPIFolder
-                        ?? throw new Exception("Unable to get mailbox root");
-            var current = root;
-
-            bool found = false;
-
-            //Loop through folders and subfolders for the proper name in appconfig.json
-            foreach (var part in subfolder.Split('/'))
+            if (_namespace == null)
             {
-                Debug.WriteLine("Part: " + part);
-                _ = current.Folders.Count; //force load
-                
-                string s = current.Name;
-
-                for (int i = 1; i <= current.Folders.Count; i++)
-                {
-                    var folder = current.Folders[i];
-                    Debug.WriteLine("    Folder: " + folder.Name);
-
-                    if (folder.Name.Equals(part, StringComparison.OrdinalIgnoreCase))
-                    {
-                        current = folder;
-                        found = true;
-                        break;
-                    }
-                    DisposeObject(folder);
-                    
-                }   
+                AppLogger.Log.Warn("Namespace is null while trying to get mailbox folder. Getting folder failed. Trying again after next timer");
+                return false;
             }
-            DisposeObject (root);
-            DisposeObject (subfolder);
-            DisposeObject (current);
 
+            //Get users own inbox
+            if (mailboxName.Equals(_namespace.CurrentUser.Name, StringComparison.OrdinalIgnoreCase))
+            {
+                _folder = (Outlook.Folder)_namespace.GetDefaultFolder(Outlook.OlDefaultFolders.olFolderInbox);
+                AppLogger.Log.Info("Found users inbox.");
+                return true;
+            }
+                
+            //Get shared mailbox
+            _folder = (Outlook.Folder)_namespace.GetSharedDefaultFolder(_recipient, Outlook.OlDefaultFolders.olFolderInbox);
 
-            if (!found) return _namespace.GetSharedDefaultFolder(_recipient, Outlook.OlDefaultFolders.olFolderInbox); ;
-            return current;
+            //Couldn't find folder, abort
+            if (_folder == null)
+                StaticMethods.Quit($"Could not locate shared folder {subfolderName}. Check to see if it is accessible and try again", 202, null);
 
+            //Found folder, and user doesnt want subfolder
+            if (subfolderName == "") return true;
 
+            //Found folder, and user provided subfolder, so begin search!
+            return _FindFolderRecursive(subfolderName);
+        }
+
+        private bool _FindFolderRecursive(string targetName)
+        {
+            List<object?> com_objects = new List<object?>();
+            if (_folder == null)
+            {
+                StaticMethods.Quit($"Finding subvolder {targetName} failed because parent folder is null", 203, null);
+                return false;
+            }
+            for(int i = 1; i < _folder.Folders.Count; i++)
+            {
+                if (_folder.Folders[i].Name.Equals(targetName, StringComparison.OrdinalIgnoreCase))
+                {
+                    com_objects.Add(_folder);
+                    _folder = (Outlook.Folder)_folder.Folders[i];
+                    AppLogger.Log.Info($"Found Outlook folder {_folder.Name}");
+                    return true;
+                }
+
+                _FindFolderRecursive(targetName);
+
+            }
+            DisposeObjects(com_objects);
+            return true;
         }
 
         public List<Dictionary<string, string>>? GetEmailListFromOutlookViaRegexLookup()
@@ -164,10 +166,11 @@ namespace Outlook2Excel
             if (_items == null) return null;
             //_currentItem is null because items exists, but is empty
             if(_currentMailItem == null) return outputDictionaryList;
-            for (int i = 1; i < _items.Count; i++)
+            for (int i = 1; i < _items.Count+1; i++)
             {
                 if (_items[i] is not Outlook.MailItem mail) continue;
                 _currentMailItem = _items[i];
+                Debug.WriteLine(_currentMailItem.Subject);
 
                 Dictionary<string, string>? outputDictionary = GetValueFromEmail();
                 //If outlook found a matching email and got the regex results
@@ -229,6 +232,8 @@ namespace Outlook2Excel
         
 
 
+
+        //Disposals
         public void Dispose()
         {
             Dispose(true);
@@ -241,6 +246,13 @@ namespace Outlook2Excel
             {
                 Marshal.ReleaseComObject(o);
                 o = null;
+            }
+        }
+        protected void DisposeObjects(List<object?> os)
+        {
+            for(int i = 0; i < os.Count; i++)
+            {
+                DisposeObject(os[i]);
             }
         }
         protected virtual void Dispose(bool disposing)

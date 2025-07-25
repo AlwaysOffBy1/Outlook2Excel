@@ -7,8 +7,7 @@ namespace Outlook2Excel.Core
 {
     public class Engine : IDisposable
     {
-        
-        public string Progress;
+
         public DisposableExcel _disposableExcel;
         private string lastRan = "";
         private bool isRunning;
@@ -30,6 +29,12 @@ namespace Outlook2Excel.Core
         //Public API
         public void RunNow() 
         {
+            if (IsRunning)
+            {
+                AppLogger.Log.Warn("System is already running during user initiated run.");
+                return;
+            }
+
             System.Diagnostics.Debug.WriteLine("Starting now...");
             IsRunning = true;
             //Prevent UI lockup with Task.Run
@@ -51,11 +56,7 @@ namespace Outlook2Excel.Core
             });
             IsRunning = false;
             System.Diagnostics.Debug.WriteLine("Finshed");
-        }
-        
-        public string GetStatus() { return Progress; }
-
-        
+        }       
 
         public string CreateSortFilters(int daysToGoBack, string subjectFilter, string fromFilter)
         {

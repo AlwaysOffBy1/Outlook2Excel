@@ -14,10 +14,27 @@ namespace Outlook2Excel
         public Application App => _excelApp;
         public Workbook Workbook => _workbook;
         public Worksheet Worksheet => _worksheet;
+        private bool islocked = false;
+        private bool _IsLocked
+        {
+            get
+            {
+                return islocked;
+            }
+            set
+            {
+                if(_excelApp != null)
+                {
+                    _excelApp.Interactive = !value;
+                    _excelApp.ScreenUpdating = !value;
+                }
+            }
+        }
 
 
         public List<string> PrimaryKeyValsAlreadyInExcel;
         public Dictionary<string, int> ExcelHeaders;
+        private int _PrimaryKeyCol = 0;
 
         public DisposableExcel(string path)
         {
@@ -85,21 +102,25 @@ namespace Outlook2Excel
         {
             try
             {
-                _excelApp.ScreenUpdating = false;
-                _excelApp.Interactive = false;
+                AppLogger.Log.Info("Locking Excel to perform data deposit");
+                _IsLocked = true;
+                AppLogger.Log.Info("Excel locked");
             }
             catch(Exception ex)
             {
-                AppLogger.Log.Warn("Excel was being edited while cells were trying to be inserted. Aborting upload and trying again after timer.");
+                AppLogger.Log.Warn("Excel was being edited while cells were trying to be inserted. Aborting upload and trying again after timer.", ex);
+                _IsLocked = false;
                 return;
             }
-            
-
             //Dont like large try's, but user can interfere at any time in so many ways
             try
             {
                 if (emailData == null || emailData.Count == 0)
+                {
+                    _IsLocked = false;
                     return;
+                }
+                    
 
                 if(ExcelHeaders.Count == 0) GetOrSetExcelHeaders(emailData[0].Keys.ToArray());
                 //Shouldn't have 2 identical primary keys, so get list of all of them before writing
@@ -109,7 +130,8 @@ namespace Outlook2Excel
 
                 //Write each row of data
                 double dictRows = emailData.Count;
-                int startRow = GetLastRow() +1;
+                int startRow = GetLastRow(_PrimaryKeyCol)+1;
+                int completedInsersions = 0;
                 for (int row = 0; row < dictRows; row++)
                 {
                     var currentDict = emailData[row];
@@ -119,21 +141,21 @@ namespace Outlook2Excel
                     if (PrimaryKeyValsAlreadyInExcel.Contains(currentDict[primaryKey])) continue;
                     _excelApp.StatusBar = $"PROCESSING ROW {row} of {dictRows} - {(int)((row/ dictRows) *100)}%";
 
-                    int i = 1;
                     foreach (var key in currentDict.Keys)
                     {
                         if(ExcelHeaders.Keys.Contains(key))
-                            _worksheet.Cells[startRow + row, ExcelHeaders[key]] = currentDict[key];
+                            _worksheet.Cells[startRow + completedInsersions, ExcelHeaders[key]] = currentDict[key];
                     }
+                    completedInsersions++;
                 }
             }
             catch(Exception ex)
             {
                 StaticMethods.Quit("Generic Excel Error after load", 301, ex);
+                _IsLocked = false;
             }
             _excelApp.StatusBar = "PROCESSING DONE";
-            _excelApp.ScreenUpdating = true;
-            _excelApp.Interactive = true;
+            _IsLocked = false;
             
         }
         private List<string> GetPrimaryKeyValsInExcel(Worksheet ws, string primaryKey)
@@ -141,18 +163,17 @@ namespace Outlook2Excel
             List<string> colValues = new List<string>();
 
             if (primaryKey == "") return new List<string>();
-            int primaryKeyCol = 0;
             if (!ExcelHeaders.Keys.Contains(primaryKey)) return new List<string>();
-            primaryKeyCol = ExcelHeaders[primaryKey];
+            _PrimaryKeyCol = ExcelHeaders[primaryKey];
 
             //Get all range in PrimaryKey column
-            int bottomRow = GetLastRow(primaryKeyCol);
-            Microsoft.Office.Interop.Excel.Range primaryKeyRange = ws.Columns[primaryKeyCol];
+            int bottomRow = GetLastRow(_PrimaryKeyCol);
+            Microsoft.Office.Interop.Excel.Range primaryKeyRange = ws.Columns[_PrimaryKeyCol];
             object[,]? values = primaryKeyRange.Value2 as object[,];
             if(values == null) return new List<string>();
 
             //Get all values in PrimaryKey column
-            for(int row = 2; row < bottomRow; row++)
+            for(int row = 2; row < bottomRow+1; row++)
             {
                 object val = values[row,1];
                 if(val != null)
