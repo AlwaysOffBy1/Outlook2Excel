@@ -117,6 +117,11 @@ namespace Outlook2Excel.Core
 
         public void Dispose()
         {
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+
             _disposableExcel.SaveAndClose();
             _disposableExcel.Dispose();
         }

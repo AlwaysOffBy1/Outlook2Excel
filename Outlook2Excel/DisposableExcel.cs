@@ -152,7 +152,7 @@ namespace Outlook2Excel
             if(values == null) return new List<string>();
 
             //Get all values in PrimaryKey column
-            for(int row = 1; row < bottomRow; row++)
+            for(int row = 2; row < bottomRow; row++)
             {
                 object val = values[row,1];
                 if(val != null)

@@ -176,10 +176,11 @@ namespace Outlook2Excel
                      outputDictionaryList.Add(outputDictionary);
                 }
             }
-
+            string sortBy = AppSettings.OrganizeBy;
+            if (sortBy == "PrimaryKey") sortBy = AppSettings.PrimaryKey;
             var output = outputDictionaryList
                 .DistinctBy(d => d[PrimaryKey])                                // remove duplicates by PrimaryKey value
-                .OrderBy(d => d.TryGetValue(d[AppSettings.OrganizeBy], out var val) ? val : "") // order by Date
+                .OrderBy(d => d.TryGetValue(sortBy, out var val) ? val : "") // order by Date
                 .ToList();
 
             //testing

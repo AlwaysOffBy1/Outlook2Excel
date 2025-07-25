@@ -93,7 +93,13 @@ namespace Outlook2Excel.GUI
             LastRan = DateTime.Now.ToString("MM/dd - hh:mm tt");
             _engine.RunNow();
             Outlook2Excel.Core.AppLogger.Log.Info("Finished running");
-            _lastRanItem.Text = LastRan;
+            Invoke(() => _lastRanItem.Text = LastRan);
+
+            //test
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
         }
 
         #region Button Click Events
