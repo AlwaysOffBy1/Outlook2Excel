@@ -23,6 +23,7 @@ namespace Outlook2Excel
         private Outlook.Recipient? _recipient;
         private Outlook.Folder? _folder;
         private Outlook.Items? _items;
+        private List<Outlook.MailItem> _mailItems;
         private Outlook.MailItem? _currentMailItem;
         private List<object?> COM_OBJECTS;
         public string InboxSortFilter{ get; set; }
@@ -44,40 +45,47 @@ namespace Outlook2Excel
             //changed spacing because it looks bloated and making it short makes me feel better
             try{
                 
+                //Create Outlook App
                 try{
                     _outlookApp = new Outlook.Application();}
                 catch (Exception ex){
                     throw new Exception("Failed to create Outlook Application", ex);}
                 
+                //Get Outlook Namespace
                 try{
                     _namespace = _outlookApp.GetNamespace("MAPI");}
                 catch (Exception ex){
                     throw new Exception("Failed to get Outlook Namespace", ex);}
                 
+                //Get Outlook Recipient (username)
                 try{
                     _recipient = _namespace.CreateRecipient(mailbox); 
                     _recipient.Resolve();}
                 catch (Exception ex){
                     throw new Exception("Failed to create recipient for mailbox: " + mailbox, ex);}
 
+                //Make sure recipient is valid
                 if (!_recipient.Resolved)
                     throw new Exception("Recipient could not be resolved");
 
+                //Get inbox folder (or subfolder)
                 try{
-                    //HATE not just assigning variable, but this makes COM disposal 100x easier
                     if (!_SetMailboxFolder(mailbox, subFolder)) throw new Exception();
                 }
                 catch (Exception ex){
                     throw new Exception($"The mailbox \"{mailbox}{(subFolder == "" || subFolder == null ? $"": $"/Inbox/{subFolder}")}\" in appsettings.json are inaccessible to this PC.\n\n Please fix the name to an accessible mailbox and try again.", ex);}
 
+                //Filter inbox
                 try{
                     _items = _folder.Items.Restrict(InboxSortFilter);}
                 catch (Exception ex){
                     throw new Exception("Failed to apply filter to inbox items: " + InboxSortFilter, ex);}
 
+                //turn Outlook.Mail.Items -> List<Outlook.MailItem> and set first MailItem
                 try{
+
                     if (_items.Count != 0)
-                        _currentMailItem = _items[1];
+                        _FilterCOMObjectsToMailItems();                        
                     else
                         _currentMailItem = null;
                 }
@@ -104,6 +112,32 @@ namespace Outlook2Excel
 
 
         }
+        private bool _FilterCOMObjectsToMailItems()
+        {
+            if (_items == null)
+                StaticMethods.Quit("Outlook mail items is null", 202, null);
+
+            //Temporary list to hold valid mail items
+            List<Outlook.MailItem> filtered = new();
+
+            for (int i = 1; i <= _items.Count; i++)
+            {
+                object item = _items[i];
+
+                if (item is Outlook.MailItem mail)
+                    filtered.Add(mail);
+                else
+                    DisposeObject(item);
+            }
+
+            //Release the original collection
+            DisposeObject(_items);
+
+            _mailItems = filtered;
+            _currentMailItem = _mailItems[0];
+            return true;
+        }
+
         private bool _SetMailboxFolder(string mailboxName, string subfolderName)
         {
             if (_namespace == null)
@@ -119,9 +153,6 @@ namespace Outlook2Excel
                 AppLogger.Log.Info("Found users inbox.");
                 return true;
             }
-                
-            //Get shared mailbox
-            _folder = (Outlook.Folder)_namespace.GetSharedDefaultFolder(_recipient, Outlook.OlDefaultFolders.olFolderInbox);
 
             //Couldn't find folder, abort
             if (_folder == null)
@@ -131,18 +162,19 @@ namespace Outlook2Excel
             if (subfolderName == "") return true;
 
             //Found folder, and user provided subfolder, so begin search!
-            return _FindFolderRecursive(subfolderName);
+            if(_FindFolderRecursive(subfolderName))
+
+            //Get shared mailbox
+            _folder = (Outlook.Folder)_namespace.GetSharedDefaultFolder(_recipient, Outlook.OlDefaultFolders.olFolderInbox);
         }
 
         private bool _FindFolderRecursive(string targetName)
         {
             List<object?> com_objects = new List<object?>();
             if (_folder == null)
-            {
                 StaticMethods.Quit($"Finding subvolder {targetName} failed because parent folder is null", 203, null);
-                return false;
-            }
-            for(int i = 1; i < _folder.Folders.Count; i++)
+
+            for(int i = 1; i <= _folder?.Folders.Count; i++)
             {
                 if (_folder.Folders[i].Name.Equals(targetName, StringComparison.OrdinalIgnoreCase))
                 {
@@ -162,14 +194,14 @@ namespace Outlook2Excel
         public List<Dictionary<string, string>>? GetEmailListFromOutlookViaRegexLookup()
         {
             List<Dictionary<string,string>> outputDictionaryList = new List<Dictionary<string,string>>();
-            //_items could not be properly populated because it does not exist
-            if (_items == null) return null;
-            //_currentItem is null because items exists, but is empty
+            //_mailItems could not be properly populated because it does not exist
+            if (_mailItems == null) return null;
+            //_currentItem is null because _mailItems exists, but is empty
             if(_currentMailItem == null) return outputDictionaryList;
-            for (int i = 1; i < _items.Count+1; i++)
+            for (int i = 0; i < _mailItems.Count; i++)
             {
-                if (_items[i] is not Outlook.MailItem mail) continue;
-                _currentMailItem = _items[i];
+                if (_mailItems[i] is not Outlook.MailItem mail) continue;
+                _currentMailItem = _mailItems[i];
                 Debug.WriteLine(_currentMailItem.Subject);
 
                 Dictionary<string, string>? outputDictionary = GetValueFromEmail();
