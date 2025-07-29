@@ -106,13 +106,13 @@ namespace Outlook2Excel
                 _IsLocked = true;
                 AppLogger.Log.Info("Excel locked");
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 AppLogger.Log.Warn("Excel was being edited while cells were trying to be inserted. Aborting upload and trying again after timer.", ex);
                 _IsLocked = false;
                 return;
             }
-            //Dont like large try's, but user can interfere at any time in so many ways
+
             try
             {
                 if (emailData == null || emailData.Count == 0)
@@ -120,43 +120,64 @@ namespace Outlook2Excel
                     _IsLocked = false;
                     return;
                 }
-                    
 
-                if(ExcelHeaders.Count == 0) GetOrSetExcelHeaders(emailData[0].Keys.ToArray());
-                //Shouldn't have 2 identical primary keys, so get list of all of them before writing
-                //Since each excel file can be open by more than 1 person at a time, and can be edited by more
-                //than one person at a time, this needs to be checked each time an edit wants to happen
-                if (primaryKey != "") PrimaryKeyValsAlreadyInExcel = GetPrimaryKeyValsInExcel(_worksheet, primaryKey).Distinct().ToList();
+                if (ExcelHeaders.Count == 0)
+                    GetOrSetExcelHeaders(emailData[0].Keys.ToArray());
 
-                //Write each row of data
-                double dictRows = emailData.Count;
-                int startRow = GetLastRow(_PrimaryKeyCol)+1;
-                int completedInsersions = 0;
-                for (int row = 0; row < dictRows; row++)
+                if (!string.IsNullOrEmpty(primaryKey))
+                    PrimaryKeyValsAlreadyInExcel = GetPrimaryKeyValsInExcel(_worksheet, primaryKey).Distinct().ToList();
+
+                int totalRows = emailData.Count;
+                int startRow = GetLastRow(_PrimaryKeyCol) + 1;
+
+                // Filter out rows with duplicate primary keys
+                var rowsToInsert = emailData
+                    .Where(d => string.IsNullOrEmpty(primaryKey) || !PrimaryKeyValsAlreadyInExcel.Contains(d[primaryKey]))
+                    .ToList();
+
+                int rowCount = rowsToInsert.Count;
+                int colCount = ExcelHeaders.Count;
+
+                if (rowCount == 0)
                 {
-                    var currentDict = emailData[row];
-
-                    //If primary key is already in excel skip it
-                    string val = currentDict[primaryKey];
-                    if (PrimaryKeyValsAlreadyInExcel.Contains(currentDict[primaryKey])) continue;
-                    _excelApp.StatusBar = $"PROCESSING ROW {row} of {dictRows} - {(int)((row/ dictRows) *100)}%";
-
-                    foreach (var key in currentDict.Keys)
-                    {
-                        if(ExcelHeaders.Keys.Contains(key))
-                            _worksheet.Cells[startRow + completedInsersions, ExcelHeaders[key]] = currentDict[key];
-                    }
-                    completedInsersions++;
+                    _IsLocked = false;
+                    return;
                 }
+
+                object[,] dataArray = new object[rowCount, colCount];
+
+                for (int r = 0; r < rowCount; r++)
+                {
+                    var dict = rowsToInsert[r];
+                    foreach (var key in dict.Keys)
+                    {
+                        if (ExcelHeaders.TryGetValue(key, out int colIndex))
+                        {
+                            //Excel is 1-based, array is 0-based
+                            dataArray[r, colIndex - 1] = dict[key];
+                        }
+                    }
+                    _excelApp.StatusBar = $"PROCESSING ROW {r + 1} of {rowCount} - {(int)((r + 1) / (double)rowCount * 100)}%";
+                }
+
+                //Write to worksheet in one operation
+                var targetRange = _worksheet.Range[
+                    _worksheet.Cells[startRow, 1],
+                    _worksheet.Cells[startRow + rowCount - 1, colCount]
+                ];
+                targetRange.Value2 = dataArray;
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 StaticMethods.Quit("Generic Excel Error after load", 301, ex);
+            }
+            finally
+            {
+                _excelApp.StatusBar = "PROCESSING DONE";
                 _IsLocked = false;
             }
-            _excelApp.StatusBar = "PROCESSING DONE";
-            _IsLocked = false;
-            
+
+
         }
         private List<string> GetPrimaryKeyValsInExcel(Worksheet ws, string primaryKey)
         {
