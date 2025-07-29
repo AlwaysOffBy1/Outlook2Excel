@@ -4,6 +4,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Linq.Expressions;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -29,89 +30,124 @@ namespace Outlook2Excel
         public string InboxSortFilter{ get; set; }
         public Dictionary<string, string> RegexMap { get; set; }
         public string PrimaryKey {  get; set; }
-
+        public string EmailAccount { get; set; }
         private bool _disposed = false;
-        public DisposableOutlook(string mailbox, string subFolder, string? inboxSortFilter, Dictionary<string,string> regexMap, string? primaryKey)
+
+
+        public DisposableOutlook(string fullFolderPath, string? inboxSortFilter, Dictionary<string,string> regexMap, string? primaryKey)
         {
             //if provided sort filter is blank, set to "look at all emails within the past x days" where x is in Appsettings.json
             InboxSortFilter = inboxSortFilter ?? $"[ReceivedTime] >= '{DateTime.Now.AddDays(0 - AppSettings.DaysToGoBack):g}'";
+
             
             COM_OBJECTS = new List<object?>();
             RegexMap = regexMap ?? new Dictionary<string,string>();
             PrimaryKey = primaryKey ?? "";
 
-            //Each COM object can fail to initialize for a different reason
-            //This is the best I could come up with to ensure good error handling
-            //changed spacing because it looks bloated and making it short makes me feel better
-            try{
-                
-                //Create Outlook App
+            //Initialize all COMs,
+            //_outlookApp -> _namespace -> _recipient -> _folder -> _items (set to _mailItems)
+
+            try
+            {
+                //OUTLOOK APP
                 try{
                     _outlookApp = new Outlook.Application();}
                 catch (Exception ex){
                     throw new Exception("Failed to create Outlook Application", ex);}
-                
-                //Get Outlook Namespace
+                COM_OBJECTS.Add(_outlookApp);
+
+                //NAMESPACE
                 try{
                     _namespace = _outlookApp.GetNamespace("MAPI");}
                 catch (Exception ex){
                     throw new Exception("Failed to get Outlook Namespace", ex);}
-                
-                //Get Outlook Recipient (username)
-                try{
-                    _recipient = _namespace.CreateRecipient(mailbox); 
-                    _recipient.Resolve();}
-                catch (Exception ex){
-                    throw new Exception("Failed to create recipient for mailbox: " + mailbox, ex);}
 
-                //Make sure recipient is valid
-                if (!_recipient.Resolved)
-                    throw new Exception("Recipient could not be resolved");
+                //RECIPIENT / FOLDER
+                if (!_SetFolderFromFullPath(fullFolderPath))
+                    StaticMethods.Quit("Unable to get folder. Quitting.", 200, null);
 
-                //Get inbox folder (or subfolder)
+                //ITEMS - FILTERED
                 try{
-                    if (!_SetMailboxFolder(mailbox, subFolder)) throw new Exception();
-                }
-                catch (Exception ex){
-                    throw new Exception($"The mailbox \"{mailbox}{(subFolder == "" || subFolder == null ? $"": $"/Inbox/{subFolder}")}\" in appsettings.json are inaccessible to this PC.\n\n Please fix the name to an accessible mailbox and try again.", ex);}
-
-                //Filter inbox
-                try{
-                    _items = _folder.Items.Restrict(InboxSortFilter);}
+                    _items = _folder?.Items.Restrict(InboxSortFilter);}
                 catch (Exception ex){
                     throw new Exception("Failed to apply filter to inbox items: " + InboxSortFilter, ex);}
 
-                //turn Outlook.Mail.Items -> List<Outlook.MailItem> and set first MailItem
                 try{
-
-                    if (_items.Count != 0)
-                        _FilterCOMObjectsToMailItems();                        
+                    if (_items?.Count != 0)
+                        _FilterCOMObjectsToMailItems();
                     else
-                        _currentMailItem = null;
-                }
+                        _currentMailItem = null;}
                 catch (Exception ex){
                     throw new Exception("Failed to retrieve first mail item from filtered inbox", ex);}
-
-                //Add all objects to a list to make disposing less lines of code
-                COM_OBJECTS.AddRange(new List<object?>
-                {
-                    _outlookApp, 
-                    _namespace, 
-                    _recipient, 
-                    _folder, 
-                    _currentMailItem
-                });
-
-                Outlook2Excel.Core.AppLogger.Log.Info("Outlook and all dependents created successfully.");
             }
             catch (Exception ex)
             {
                 Dispose();
-                StaticMethods.Quit("Unable to boot up Outlook", 200, ex);
+                StaticMethods.Quit(ex.Message, 200, ex);
             }
+            
 
 
         }
+
+        private bool _SetFolderFromFullPath(string fullEmailPath)
+        {
+            if (string.IsNullOrWhiteSpace(fullEmailPath))
+                StaticMethods.Quit("FullEmailPath is empty.", 200, null);
+
+            //Normalize and split path parts
+            string[] parts = fullEmailPath.Split('\\', StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length < 2)
+                StaticMethods.Quit("FullEmailPath is invalid. Must be like: \\\\mailbox\\Inbox\\Subfolder...", 201, null);
+
+            EmailAccount = parts[0];
+            string[] folderPath = parts.Skip(1).ToArray();
+
+            //Resolve recipient
+            _recipient = _namespace.CreateRecipient(EmailAccount);
+            COM_OBJECTS.Add(_recipient);
+            _recipient.Resolve();
+
+            if (!_recipient.Resolved)
+                StaticMethods.Quit($"Mailbox '{EmailAccount}' could not be resolved.", 202, null);
+
+            //Get the store root
+            Outlook.Folder inbox = (Outlook.Folder)_namespace.GetSharedDefaultFolder(_recipient, Outlook.OlDefaultFolders.olFolderInbox);
+            Outlook.Folder current = (Outlook.Folder)inbox.Parent;
+
+            // Traverse the folder path step-by-step
+            foreach (string folderName in folderPath)
+            {
+                Outlook.Folder? next = null;
+
+                for (int i = 1; i <= current.Folders.Count; i++)
+                {
+                    var sub = (Outlook.Folder)current.Folders[i];
+                    Debug.WriteLine("Found " + current.Name + "\\" + sub.Name);
+
+                    if (sub.Name.Trim().Equals(folderName.Trim(), StringComparison.OrdinalIgnoreCase))
+                    {
+                        next = sub;
+                        break;
+                    }
+
+                    DisposeObject(sub);
+                }
+
+                if (next == null & next.Name != "Inbox")
+                    StaticMethods.Quit($"Folder '{folderName}' not found under '{current.Name}'.", 203, null);
+
+                if (!ReferenceEquals(current, next))
+                    DisposeObject(current);
+
+                current = next;
+            }
+
+            _folder = current;
+            AppLogger.Log.Info($"Folder set to: {_folder.FolderPath}");
+            return true;
+        }
+
         private bool _FilterCOMObjectsToMailItems()
         {
             if (_items == null)
@@ -136,61 +172,7 @@ namespace Outlook2Excel
             _mailItems = filtered;
             _currentMailItem = _mailItems[0];
             return true;
-        }
-
-        private bool _SetMailboxFolder(string mailboxName, string subfolderName)
-        {
-            if (_namespace == null)
-            {
-                AppLogger.Log.Warn("Namespace is null while trying to get mailbox folder. Getting folder failed. Trying again after next timer");
-                return false;
-            }
-
-            //Get users own inbox
-            if (mailboxName.Equals(_namespace.CurrentUser.Name, StringComparison.OrdinalIgnoreCase))
-            {
-                _folder = (Outlook.Folder)_namespace.GetDefaultFolder(Outlook.OlDefaultFolders.olFolderInbox);
-                AppLogger.Log.Info("Found users inbox.");
-                return true;
-            }
-
-            //Couldn't find folder, abort
-            if (_folder == null)
-                StaticMethods.Quit($"Could not locate shared folder {subfolderName}. Check to see if it is accessible and try again", 202, null);
-
-            //Found folder, and user doesnt want subfolder
-            if (subfolderName == "") return true;
-
-            //Found folder, and user provided subfolder, so begin search!
-            if(_FindFolderRecursive(subfolderName))
-
-            //Get shared mailbox
-            _folder = (Outlook.Folder)_namespace.GetSharedDefaultFolder(_recipient, Outlook.OlDefaultFolders.olFolderInbox);
-        }
-
-        private bool _FindFolderRecursive(string targetName)
-        {
-            List<object?> com_objects = new List<object?>();
-            if (_folder == null)
-                StaticMethods.Quit($"Finding subvolder {targetName} failed because parent folder is null", 203, null);
-
-            for(int i = 1; i <= _folder?.Folders.Count; i++)
-            {
-                if (_folder.Folders[i].Name.Equals(targetName, StringComparison.OrdinalIgnoreCase))
-                {
-                    com_objects.Add(_folder);
-                    _folder = (Outlook.Folder)_folder.Folders[i];
-                    AppLogger.Log.Info($"Found Outlook folder {_folder.Name}");
-                    return true;
-                }
-
-                _FindFolderRecursive(targetName);
-
-            }
-            DisposeObjects(com_objects);
-            return true;
-        }
-
+        }        
         public List<Dictionary<string, string>>? GetEmailListFromOutlookViaRegexLookup()
         {
             List<Dictionary<string,string>> outputDictionaryList = new List<Dictionary<string,string>>();
@@ -261,10 +243,7 @@ namespace Outlook2Excel
             else return null;
         }
 
-        
-
-
-
+        #region Disposals
         //Disposals
         public void Dispose()
         {
@@ -303,6 +282,7 @@ namespace Outlook2Excel
         {
             Dispose(false);
         }
+        #endregion
     }
 
 }

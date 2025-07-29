@@ -9,17 +9,17 @@ namespace Outlook2Excel
 {
     public static class AppSettings
     {
-        public static string Mailbox { get; private set; } = "";
         public static string PrimaryKey { get; private set; } = "Subject";
         public static string ExcelFilePath { get; private set; } = "";
         public static Dictionary<string, string> RegexMap { get; set; } = new Dictionary<string, string>();
         public static bool IsContainsPrimaryKey { get; private set; } = false;
         public static int DaysToGoBack { get; set; } = 1;
         public static int TimerInterval { get; set; } = 5;
-        public static string SubFolder { get; private set; } = "";
         public static string SubjectFilter { get; private set; } = "";
         public static string FromFilter { get; private set; } = "";
         public static string OrganizeBy { get; private set; } = "EmailDate";
+
+        public static string FullFolderPath { get; private set; } = "";
 
         public static bool GetSettings()
         {
@@ -31,20 +31,19 @@ namespace Outlook2Excel
             if (config == null) return false;
 
             //Set vars
-            Mailbox = config["Mailbox"] ?? "";
+            FullFolderPath = config["FullFolderPath"] ?? "";
             PrimaryKey = config["PrimaryKey"] ?? "Subject";
             IsContainsPrimaryKey = PrimaryKey != "";
             ExcelFilePath = config["ExcelFilePath"] ?? "";
             DaysToGoBack = TryConvertToInt(config["DaysToGoBack"]) ?? DaysToGoBack;
             RegexMap = ImportEmailMappings(config);
             TimerInterval = TryConvertToInt(config["TimerInterval"]) ?? TimerInterval;
-            SubFolder = config["SubFolder"] ?? string.Empty;
             SubjectFilter = config["SubjectFilter"] ?? string.Empty;
             FromFilter = config["FromFilter"] ?? string.Empty;
             OrganizeBy = config["OrganizeBy"] ?? "EmailDate";
 
             //If any mandatory vars are null return false
-            return Mailbox != null
+            return FullFolderPath != null
                 && PrimaryKey != null
                 && ExcelFilePath != null
                 && RegexMap != null;

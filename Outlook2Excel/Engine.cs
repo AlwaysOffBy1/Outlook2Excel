@@ -92,7 +92,7 @@ namespace Outlook2Excel.Core
             try
             {
                 //DisposableOutlook handles all it's child COM objects upon disposal
-                using (DisposableOutlook disposableOutlook = new DisposableOutlook(AppSettings.Mailbox, AppSettings.SubFolder, inboxSortFilter, AppSettings.RegexMap, AppSettings.PrimaryKey))
+                using (DisposableOutlook disposableOutlook = new DisposableOutlook(AppSettings.FullFolderPath, inboxSortFilter, AppSettings.RegexMap, AppSettings.PrimaryKey))
                 {
                     Outlook2Excel.Core.AppLogger.Log.Info("Outlook instance created");
                     try
