@@ -129,6 +129,7 @@ namespace Outlook2Excel
 
                 int totalRows = emailData.Count;
                 int startRow = GetLastRow(_PrimaryKeyCol) + 1;
+                if (startRow <= 0) return;
 
                 // Filter out rows with duplicate primary keys
                 var rowsToInsert = emailData
@@ -189,6 +190,7 @@ namespace Outlook2Excel
 
             //Get all range in PrimaryKey column
             int bottomRow = GetLastRow(_PrimaryKeyCol);
+            if(bottomRow <= 0) return new List<string>();
             Microsoft.Office.Interop.Excel.Range primaryKeyRange = ws.Columns[_PrimaryKeyCol];
             object[,]? values = primaryKeyRange.Value2 as object[,];
             if(values == null) return new List<string>();
@@ -205,12 +207,20 @@ namespace Outlook2Excel
         }
         private int GetLastRow(int column = 1)
         {
-            Microsoft.Office.Interop.Excel.Range lastCell = _worksheet.Cells[_worksheet.Rows.Count, column];
-            Microsoft.Office.Interop.Excel.Range lastUsed = lastCell.End[XlDirection.xlUp];
+            int lastRow;
+            try
+            {
+                Microsoft.Office.Interop.Excel.Range lastCell = _worksheet.Cells[_worksheet.Rows.Count, column];
+                Microsoft.Office.Interop.Excel.Range lastUsed = lastCell.End[XlDirection.xlUp];
 
-            AppLogger.Log.Info($"Last used row found at {lastUsed.Row}.");
-            int lastRow = lastUsed.Row;
-
+                lastRow = lastUsed.Row;
+                AppLogger.Log.Info($"Last used row found at {lastUsed.Row}.");
+            }
+            catch(Exception ex)
+            {
+                AppLogger.Log.Warn("Excel was busy when trying to find last row. Aborting row write. Trying again after timer");
+                lastRow = -1;
+            }
             // Avoid writing over data
             return lastRow;
         }

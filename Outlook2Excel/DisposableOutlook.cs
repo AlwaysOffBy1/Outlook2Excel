@@ -85,9 +85,6 @@ namespace Outlook2Excel
                 Dispose();
                 StaticMethods.Quit(ex.Message, 200, ex);
             }
-            
-
-
         }
 
         private bool _SetFolderFromFullPath(string fullEmailPath)
@@ -95,7 +92,7 @@ namespace Outlook2Excel
             if (string.IsNullOrWhiteSpace(fullEmailPath))
                 StaticMethods.Quit("FullEmailPath is empty.", 200, null);
 
-            //Normalize and split path parts
+            // Normalize and split: "\\mailbox\\Inbox\\Subfolder" => ["mailbox", "Inbox", "Subfolder"]
             string[] parts = fullEmailPath.Split('\\', StringSplitOptions.RemoveEmptyEntries);
             if (parts.Length < 2)
                 StaticMethods.Quit("FullEmailPath is invalid. Must be like: \\\\mailbox\\Inbox\\Subfolder...", 201, null);
@@ -103,50 +100,31 @@ namespace Outlook2Excel
             EmailAccount = parts[0];
             string[] folderPath = parts.Skip(1).ToArray();
 
-            //Resolve recipient
-            _recipient = _namespace.CreateRecipient(EmailAccount);
-            COM_OBJECTS.Add(_recipient);
-            _recipient.Resolve();
+            // Access root mailbox folder (not Inbox)
+            Outlook.MAPIFolder mailboxRoot = _namespace.Folders[EmailAccount];
+            if (mailboxRoot == null)
+                StaticMethods.Quit($"Unable to find root folder for mailbox '{EmailAccount}'.", 202, null);
 
-            if (!_recipient.Resolved)
-                StaticMethods.Quit($"Mailbox '{EmailAccount}' could not be resolved.", 202, null);
-
-            //Get the store root
-            Outlook.Folder inbox = (Outlook.Folder)_namespace.GetSharedDefaultFolder(_recipient, Outlook.OlDefaultFolders.olFolderInbox);
-            Outlook.Folder current = (Outlook.Folder)inbox.Parent;
-
-            // Traverse the folder path step-by-step
-            foreach (string folderName in folderPath)
+            // Navigate directly using path
+            Outlook.MAPIFolder current = mailboxRoot;
+            foreach (var part in folderPath)
             {
-                Outlook.Folder? next = null;
-
-                for (int i = 1; i <= current.Folders.Count; i++)
+                _ = current.Folders.Count; // Force enumeration
+                try
                 {
-                    var sub = (Outlook.Folder)current.Folders[i];
-                    Debug.WriteLine("Found " + current.Name + "\\" + sub.Name);
-
-                    if (sub.Name.Trim().Equals(folderName.Trim(), StringComparison.OrdinalIgnoreCase))
-                    {
-                        next = sub;
-                        break;
-                    }
-
-                    DisposeObject(sub);
+                    current = current.Folders[part];
                 }
-
-                if (next == null & next.Name != "Inbox")
-                    StaticMethods.Quit($"Folder '{folderName}' not found under '{current.Name}'.", 203, null);
-
-                if (!ReferenceEquals(current, next))
-                    DisposeObject(current);
-
-                current = next;
+                catch
+                {
+                    StaticMethods.Quit($"Folder '{part}' not found under '{current.Name}'.", 203, null);
+                }
             }
 
-            _folder = current;
+            _folder = (Outlook.Folder)current;
             AppLogger.Log.Info($"Folder set to: {_folder.FolderPath}");
             return true;
         }
+
 
         private bool _FilterCOMObjectsToMailItems()
         {
