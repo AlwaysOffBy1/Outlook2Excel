@@ -1,9 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Configuration.Internal;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
+using Outlook2Excel.Core;
 
 namespace Outlook2Excel
 {
@@ -28,11 +30,20 @@ namespace Outlook2Excel
 
         public static bool GetSettings()
         {
-            //Get config from file
-            var config = new ConfigurationBuilder()
-                 .SetBasePath(Directory.GetCurrentDirectory())
-                 .AddJsonFile("appsettings.json")
-                 .Build();
+            IConfigurationRoot? config = null;
+            try
+            {
+                //Get config from file
+                config = new ConfigurationBuilder()
+                     .SetBasePath(Directory.GetCurrentDirectory())
+                     .AddJsonFile("appsettings.json")
+                     .Build();
+            }
+            catch(Exception ex)
+            {
+                StaticMethods.Quit("Unable to get args.", 2, ex);
+            }
+            
             if (config == null) return false;
 
             //Set vars

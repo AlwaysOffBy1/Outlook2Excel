@@ -45,7 +45,7 @@ namespace Outlook2Excel.GUI
 
             _trayIcon = new NotifyIcon
             {
-                Icon = SystemIcons.Application, //TODO change to icon
+                Icon = new Icon("Outlook2Excel.ico"), //TODO change to icon
                 ContextMenuStrip = _trayMenu,
                 Visible = true,
                 Text = "Outlook2Excel"

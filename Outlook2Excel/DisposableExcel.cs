@@ -78,11 +78,17 @@ namespace Outlook2Excel
 
         public void SaveAndClose()
         {
-            IsProgramInitiatedClose = true;
-            _workbook.Save();
-            _workbook.Close(false);
-            _excelApp.Quit();
-            
+            try
+            {
+                IsProgramInitiatedClose = true;
+                _workbook.Save();
+                _workbook.Close(false);
+                _excelApp.Quit();
+            }
+            catch(Exception ex)
+            {
+                StaticMethods.Quit("Excel failed to close properly. Make sure it is not open on server before trying again.", 203, ex);
+            }            
         }
 
         private void GetOrSetExcelHeaders(string[] dataHeaders)
