@@ -18,7 +18,12 @@ namespace Outlook2Excel
         public static string SubjectFilter { get; private set; } = "";
         public static string FromFilter { get; private set; } = "";
         public static string OrganizeBy { get; private set; } = "EmailDate";
-
+        public static bool IsOnErrorSendEmail { get; private set; } = false;
+        public static string OnErrorSendEmailSMTPPath { get; private set; } = "";
+        public static string OnErrorSendEmailFrom { get; private set; } = "";
+        public static string OnErrorSendEmailFromName { get; private set; } = "Unnamed Outlok2Excel Service";
+        public static string OnErrorSendEmailSubject { get; private set; } = "No Subject";
+        public static string[] OnErroSendEmailTo { get; private set; } = new string[0];
         public static string FullFolderPath { get; private set; } = "";
 
         public static bool GetSettings()
@@ -32,15 +37,22 @@ namespace Outlook2Excel
 
             //Set vars
             FullFolderPath = config["FullFolderPath"] ?? "";
-            PrimaryKey = config["PrimaryKey"] ?? "Subject";
+            PrimaryKey = config["PrimaryKey"] ?? PrimaryKey;
             IsContainsPrimaryKey = PrimaryKey != "";
-            ExcelFilePath = config["ExcelFilePath"] ?? "";
+            ExcelFilePath = config["ExcelFilePath"] ?? ExcelFilePath;
             DaysToGoBack = TryConvertToInt(config["DaysToGoBack"]) ?? DaysToGoBack;
             RegexMap = ImportEmailMappings(config);
             TimerInterval = TryConvertToInt(config["TimerInterval"]) ?? TimerInterval;
-            SubjectFilter = config["SubjectFilter"] ?? string.Empty;
-            FromFilter = config["FromFilter"] ?? string.Empty;
+            SubjectFilter = config["SubjectFilter"] ?? SubjectFilter;
+            FromFilter = config["FromFilter"] ?? FromFilter;
             OrganizeBy = config["OrganizeBy"] ?? "EmailDate";
+
+            IsOnErrorSendEmail = TryConvertToBool(config["IsOnErrorSendEmail"]) ?? IsOnErrorSendEmail;
+            OnErrorSendEmailSMTPPath = config["OnErrorSendEmailSMTPPath"] ?? OnErrorSendEmailSMTPPath;
+            OnErrorSendEmailFrom = config["OnErrorSendEmailFrom"] ?? "";
+            OnErrorSendEmailFromName = config["OnErrorSendEmailFromName"] ?? OnErrorSendEmailFromName;
+            OnErrorSendEmailSubject = config["OnErrorSendEmailSubject"] ?? OnErrorSendEmailSubject;
+            OnErroSendEmailTo = string.IsNullOrEmpty(config["OnErroSendEmailTo"]) ? Array.Empty<string>() : config["OnErroSendEmailTo"].Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
             //If any mandatory vars are null return false
             return FullFolderPath != null
@@ -71,6 +83,10 @@ namespace Outlook2Excel
         private static int? TryConvertToInt(string? value)
         {
             return int.TryParse(value, out int result) ? result : null;
+        }
+        private static bool? TryConvertToBool(string? value)
+        {
+            return bool.TryParse(value, out bool result) ? result : null;
         }
     }
 }

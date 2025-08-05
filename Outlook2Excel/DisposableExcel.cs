@@ -10,6 +10,7 @@ namespace Outlook2Excel
         private Workbook _workbook;
         private Worksheet _worksheet;
         private bool _disposed = false;
+        private string _fileName;
         public bool IsProgramInitiatedClose = false;
         public Application App => _excelApp;
         public Workbook Workbook => _workbook;
@@ -38,6 +39,11 @@ namespace Outlook2Excel
 
         public DisposableExcel(string path)
         {
+            _fileName = path;
+            _CreateExcel(path);
+        }
+        private void _CreateExcel(string path)
+        {
             if (!File.Exists(path))
                 StaticMethods.Quit("Excel file path not found", 100, null);
 
@@ -58,10 +64,12 @@ namespace Outlook2Excel
             }
 
             if (_workbook == null) _workbook = new Workbook();
-            if(_worksheet == null) _worksheet = new Worksheet();
+            if (_worksheet == null) _worksheet = new Worksheet();
 
             _excelApp.WorkbookBeforeClose += IsUserTryingToCloseWB;
         }
+
+        
 
         private void IsUserTryingToCloseWB(Workbook Wb, ref bool Cancel)
         {
@@ -74,6 +82,7 @@ namespace Outlook2Excel
             _workbook.Save();
             _workbook.Close(false);
             _excelApp.Quit();
+            
         }
 
         private void GetOrSetExcelHeaders(string[] dataHeaders)
@@ -228,6 +237,32 @@ namespace Outlook2Excel
         {
             Dispose(true);
             GC.SuppressFinalize(this);
+        }
+
+        private void ResetExcelApp()
+        {
+            try
+            {
+                SaveAndClose();
+                Marshal.FinalReleaseComObject(_excelApp);
+                DisposeObject(_excelApp);
+                DisposeObject(_worksheet);
+                DisposeObject(_workbook);
+                _CreateExcel(_fileName);
+            }
+            catch (Exception ex)
+            {
+                StaticMethods.Quit("Excel failed to restart after being restarted.", 500, ex);
+            }
+        }
+
+        protected void DisposeObject(object? o)
+        {
+            if (o != null)
+            {
+                Marshal.ReleaseComObject(o);
+                o = null;
+            }
         }
 
         protected virtual void Dispose(bool disposing)

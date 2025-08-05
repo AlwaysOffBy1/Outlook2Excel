@@ -22,6 +22,7 @@ namespace Outlook2Excel.Core
             //This opens Excel, which should stay open
             AppLogger.Log.Info("Opening Excel");
             _disposableExcel = new DisposableExcel(AppSettings.ExcelFilePath);
+            
         }
 
         
