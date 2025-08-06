@@ -14,7 +14,10 @@ namespace Outlook2Excel.Core
         public static void Quit(string reason, int errorCode, Exception? e)
         {
             Outlook2Excel.Core.AppLogger.Log.Error(reason, e);
-            if (!_quitting && AppSettings.IsOnErrorSendEmail) SendEmail(AppSettings.OnErroSendEmailTo,AppSettings.OnErrorSendEmailSubject, reason);
+            if (!_quitting && AppSettings.IsOnErrorSendEmail) 
+                SendEmail(AppSettings.OnErroSendEmailTo,
+                          AppSettings.OnErrorSendEmailSubject, 
+                          string.Join(reason, e == null ? "": "\n\n", e?.Message));
             Console.WriteLine(reason);
             Environment.Exit(errorCode);
         }

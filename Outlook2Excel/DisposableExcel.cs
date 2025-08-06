@@ -207,7 +207,15 @@ namespace Outlook2Excel
             int bottomRow = GetLastRow(_PrimaryKeyCol);
             if(bottomRow <= 0) return new List<string>();
             Microsoft.Office.Interop.Excel.Range primaryKeyRange = ws.Columns[_PrimaryKeyCol];
-            object[,]? values = primaryKeyRange.Value2 as object[,];
+            object[,]? values = null;
+            try
+            {
+                values = primaryKeyRange.Value2 as object[,];
+            }
+            catch (Exception ex)
+            {
+                StaticMethods.Quit($"Excel could not access the primary key column {_PrimaryKeyCol}.",305,ex);
+            }
             if(values == null) return new List<string>();
 
             //Get all values in PrimaryKey column
